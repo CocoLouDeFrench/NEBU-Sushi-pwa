@@ -2,19 +2,29 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#1d1d1b">
-<title>NEBU Sushi – Bestellung</title>
+
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+>
+
+<meta name="theme-color" content="#000000">
+
+<title>NEBU Sushi – Online bestellen</title>
 
 <style>
+
 :root{
-  --bg:#171716;
-  --panel:#292928;
-  --text:#f5f5f3;
-  --muted:#c9c9c4;
-  --line:#3b3b39;
-  --accent:#ff7900;
-  --green:#25D366;
+  --background:#000000;
+  --card:#0d0d0d;
+  --card-soft:#151515;
+  --text:#ffffff;
+  --muted:#b9b9b9;
+  --gold:#f6c700;
+  --gold-soft:#cdb07d;
+  --border:#292929;
+  --danger:#f0182d;
+  --whatsapp:#25d366;
 }
 
 *{
@@ -27,686 +37,1315 @@ html{
 
 body{
   margin:0;
-  background:var(--bg);
+  background:var(--background);
   color:var(--text);
   font-family:Arial,Helvetica,sans-serif;
-  padding-bottom:210px;
+  padding-bottom:110px;
 }
 
-header{
+button,
+input,
+select,
+textarea{
+  font:inherit;
+}
+
+button{
+  cursor:pointer;
+}
+
+/* HEADER */
+
+.shop-header{
   position:sticky;
   top:0;
-  z-index:20;
-  background:rgba(29,29,27,.98);
-  border-bottom:1px solid var(--line);
-  padding:14px 16px 10px;
+  z-index:100;
+  background:rgba(0,0,0,.96);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
 }
 
-.brand{
+.header-main{
+  max-width:1200px;
+  margin:auto;
+  padding:14px 18px;
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap:12px;
-  margin-bottom:12px;
+  gap:18px;
 }
 
-.brand h1{
-  margin:0;
-  font-size:22px;
-  letter-spacing:.4px;
-}
-
-.brand small{
-  color:var(--muted);
-}
-
-.search{
-  width:100%;
-  border:1px solid #4a4a46;
-  background:#3a3a37;
-  color:white;
-  border-radius:28px;
-  padding:13px 18px;
-  font-size:16px;
-  outline:none;
-}
-
-.categories{
+.logo-area{
   display:flex;
-  gap:8px;
-  overflow:auto;
-  padding:12px 0 2px;
-  scrollbar-width:none;
+  align-items:center;
+  gap:14px;
+  min-width:0;
 }
 
-.categories::-webkit-scrollbar{
+.logo-area img{
+  width:130px;
+  max-height:62px;
+  object-fit:contain;
+}
+
+.shop-name{
   display:none;
 }
 
-.categories button{
-  white-space:nowrap;
-  border:1px solid #555550;
-  background:#2d2d2b;
+.header-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.icon-button{
+  position:relative;
+  width:48px;
+  height:48px;
+  border-radius:50%;
+  border:1px solid var(--border);
+  background:#0c0c0c;
   color:white;
-  border-radius:24px;
-  padding:9px 14px;
-  font-weight:700;
-  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:24px;
 }
 
-.categories button.active{
-  background:#f1f1ef;
-  color:#242422;
+.cart-badge{
+  position:absolute;
+  top:-5px;
+  right:-3px;
+  min-width:22px;
+  height:22px;
+  padding:0 6px;
+  background:var(--danger);
+  color:white;
+  border-radius:999px;
+  font-size:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:800;
 }
 
-main{
-  max-width:900px;
+.preparation-time{
+  max-width:1200px;
   margin:auto;
-}
-
-.section-head{
-  background:#11110f;
-  padding:24px 18px 18px;
-  border-bottom:1px solid var(--line);
-}
-
-.section-head h2{
-  margin:0 0 8px;
-  font-size:30px;
-}
-
-.section-head p{
-  margin:0;
-  color:var(--muted);
-  line-height:1.45;
-}
-
-.item{
-  display:grid;
-  grid-template-columns:1fr auto;
+  padding:8px 18px 16px;
+  display:flex;
+  align-items:center;
   gap:12px;
-  padding:20px 18px;
-  background:var(--panel);
-  border-bottom:1px solid var(--line);
-}
-
-.item h3{
-  margin:0 0 9px;
-  font-size:21px;
-}
-
-.price{
-  font-size:20px;
-  font-weight:700;
-  margin-bottom:10px;
-}
-
-.desc{
-  color:var(--muted);
-  line-height:1.45;
+  color:#eeeeee;
   font-size:17px;
 }
 
-.add{
-  width:50px;
-  height:50px;
+.preparation-icon{
+  width:34px;
+  height:34px;
+  border:2px solid white;
   border-radius:50%;
-  border:1px solid #66665f;
-  background:#2b2b29;
-  color:var(--accent);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
+}
+
+/* SEARCH */
+
+.search-container{
+  display:none;
+  max-width:1200px;
+  margin:auto;
+  padding:0 18px 14px;
+}
+
+.search-container.open{
+  display:block;
+}
+
+.search-container input{
+  width:100%;
+  border:1px solid var(--border);
+  background:#151515;
+  color:white;
+  padding:14px 18px;
+  border-radius:30px;
+  outline:none;
+  font-size:16px;
+}
+
+.search-container input:focus{
+  border-color:var(--gold-soft);
+}
+
+/* CATEGORY NAVIGATION */
+
+.category-wrapper{
+  position:sticky;
+  top:111px;
+  z-index:90;
+  background:#000;
+  border-bottom:1px solid var(--border);
+}
+
+.category-nav{
+  max-width:1200px;
+  margin:auto;
+  padding:14px 18px;
+  display:flex;
+  gap:12px;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+
+.category-nav::-webkit-scrollbar{
+  display:none;
+}
+
+.category-button{
+  flex:none;
+  border:2px solid white;
+  border-radius:15px;
+  padding:13px 20px;
+  background:var(--gold-soft);
+  color:white;
+  font-size:16px;
+  letter-spacing:.3px;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+
+.category-button.active{
+  background:white;
+  color:#7a7a70;
+}
+
+/* HERO */
+
+.hero{
+  max-width:1200px;
+  margin:auto;
+  padding:32px 18px 20px;
+  text-align:center;
+}
+
+.hero-logo{
+  width:250px;
+  max-width:70%;
+  margin-bottom:12px;
+}
+
+.hero h1{
   font-size:34px;
+  margin:0 0 8px;
+  font-weight:400;
+  letter-spacing:2px;
+}
+
+.hero p{
+  margin:0;
+  color:var(--muted);
+  font-size:17px;
+}
+
+/* MENU */
+
+.menu-container{
+  max-width:1200px;
+  margin:auto;
+}
+
+.menu-section{
+  padding:20px 18px 10px;
+  scroll-margin-top:190px;
+}
+
+.section-title{
+  margin:0 0 26px;
+  font-size:38px;
+  font-weight:300;
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+}
+
+.section-note{
+  margin:-14px 0 28px;
+  color:var(--muted);
+  line-height:1.6;
+  max-width:820px;
+}
+
+.product-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0,1fr));
+  gap:38px 22px;
+}
+
+.product-card{
+  position:relative;
+  min-width:0;
+  text-align:center;
+}
+
+.product-image-wrapper{
+  position:relative;
+  width:100%;
+  aspect-ratio:1 / 1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin-bottom:10px;
+}
+
+.product-image{
+  width:82%;
+  height:82%;
+  object-fit:contain;
+  filter:drop-shadow(0 10px 22px rgba(0,0,0,.55));
+}
+
+.image-fallback{
+  width:80%;
+  height:80%;
+  background:radial-gradient(circle,#222 0%,#0c0c0c 65%,#000 100%);
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#7a7a7a;
+  font-size:48px;
+}
+
+.add-button{
+  position:absolute;
+  right:5%;
+  top:6%;
+  width:56px;
+  height:56px;
+  border-radius:50%;
+  border:none;
+  background:white;
+  color:var(--gold-soft);
+  font-size:38px;
+  font-weight:300;
   line-height:1;
-  cursor:pointer;
-  align-self:center;
+  box-shadow:0 4px 14px rgba(0,0,0,.35);
+}
+
+.add-button:active{
+  transform:scale(.95);
+}
+
+.product-name{
+  margin:0;
+  min-height:52px;
+  font-size:20px;
+  font-weight:400;
+  line-height:1.3;
+  text-transform:uppercase;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+
+.product-price{
+  margin:8px 0 18px;
+  font-size:21px;
+}
+
+.product-actions{
+  display:flex;
+  justify-content:center;
+  gap:16px;
+  align-items:center;
+}
+
+.favorite-button,
+.info-button{
+  border:none;
+  background:none;
+  color:white;
+  padding:0;
+}
+
+.favorite-button{
+  font-size:31px;
+}
+
+.info-button{
+  font-size:16px;
+  font-weight:800;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+.info-symbol{
+  width:30px;
+  height:30px;
+  border:2px solid white;
+  border-radius:50%;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-family:serif;
+  font-size:20px;
 }
 
 .unavailable{
   opacity:.38;
 }
 
-.unavailable .add{
+.unavailable .add-button{
   display:none;
 }
 
 .unavailable-label{
-  font-weight:700;
-  color:#d0d0cb;
-  margin-bottom:8px;
-}
-
-.cart{
-  position:fixed;
-  left:0;
-  right:0;
-  bottom:0;
-  z-index:30;
-  background:#f5f5f0;
-  color:#1d1d1b;
-  border-top:3px solid var(--accent);
-  box-shadow:0 -8px 20px rgba(0,0,0,.35);
-  padding:12px 14px calc(12px + env(safe-area-inset-bottom));
-}
-
-.cart-inner{
-  max-width:900px;
-  margin:auto;
-}
-
-.cart-top{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:10px;
-}
-
-.cart h2{
-  font-size:18px;
-  margin:0;
-}
-
-.total{
+  display:inline-block;
+  margin-top:8px;
+  color:#d0d0d0;
   font-weight:800;
-  font-size:20px;
 }
 
-.cart-items{
-  max-height:92px;
-  overflow:auto;
-  margin:8px 0;
-  font-size:14px;
+/* INFO MODAL */
+
+.modal-overlay{
+  position:fixed;
+  inset:0;
+  z-index:500;
+  background:rgba(0,0,0,.78);
+  display:none;
+  align-items:flex-end;
+  justify-content:center;
+}
+
+.modal-overlay.open{
+  display:flex;
+}
+
+.product-modal{
+  width:100%;
+  max-width:650px;
+  max-height:86vh;
+  overflow-y:auto;
+  background:#111;
+  border-radius:24px 24px 0 0;
+  border-top:1px solid #343434;
+  padding:22px;
+  animation:slideUp .25s ease;
+}
+
+@keyframes slideUp{
+  from{
+    transform:translateY(100%);
+  }
+
+  to{
+    transform:translateY(0);
+  }
+}
+
+.modal-close{
+  float:right;
+  width:42px;
+  height:42px;
+  border-radius:50%;
+  background:#252525;
+  color:white;
+  border:none;
+  font-size:22px;
+}
+
+.modal-image{
+  width:100%;
+  height:230px;
+  object-fit:contain;
+  margin-top:10px;
+}
+
+.product-modal h2{
+  margin:18px 0 8px;
+  font-size:26px;
+}
+
+.modal-price{
+  color:var(--gold);
+  font-size:22px;
+  font-weight:800;
+}
+
+.modal-description{
+  color:#d2d2d2;
+  line-height:1.6;
+  font-size:17px;
+}
+
+.modal-add{
+  width:100%;
+  margin-top:20px;
+  border:none;
+  border-radius:12px;
+  padding:15px;
+  background:white;
+  color:black;
+  font-weight:800;
+  font-size:17px;
+}
+
+/* CART DRAWER */
+
+.cart-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.72);
+  z-index:600;
+  display:none;
+}
+
+.cart-overlay.open{
+  display:block;
+}
+
+.cart-drawer{
+  position:absolute;
+  top:0;
+  right:0;
+  width:min(440px,100%);
+  height:100%;
+  background:#111;
+  padding:20px;
+  overflow-y:auto;
+  border-left:1px solid var(--border);
+}
+
+.cart-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:20px;
+}
+
+.cart-header h2{
+  margin:0;
+  font-size:28px;
+}
+
+.close-cart{
+  width:42px;
+  height:42px;
+  border:none;
+  border-radius:50%;
+  background:#272727;
+  color:white;
+  font-size:22px;
+}
+
+.cart-empty{
+  color:var(--muted);
+  text-align:center;
+  padding:40px 0;
 }
 
 .cart-row{
+  padding:16px 0;
+  border-bottom:1px solid var(--border);
+}
+
+.cart-row-top{
   display:flex;
   justify-content:space-between;
   gap:12px;
-  padding:4px 0;
 }
 
-.qty{
-  display:inline-flex;
-  align-items:center;
-  gap:7px;
-}
-
-.qty button{
-  width:26px;
-  height:26px;
-  border-radius:50%;
-  border:0;
-  background:#2a2a27;
-  color:white;
+.cart-row-name{
   font-weight:700;
 }
 
-.form{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:8px;
-  margin-top:8px;
+.cart-row-price{
+  white-space:nowrap;
 }
 
-.form input{
-  width:100%;
-  border:1px solid #c9c9c3;
-  border-radius:8px;
-  padding:10px;
-  font-size:15px;
-  background:white;
+.quantity-control{
+  margin-top:12px;
+  display:flex;
+  align-items:center;
+  gap:12px;
 }
 
-.send{
-  grid-column:1/-1;
-  border:0;
-  border-radius:10px;
-  background:var(--green);
+.quantity-control button{
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  border:none;
+  background:#292929;
   color:white;
-  padding:12px;
+  font-size:19px;
+}
+
+.cart-total{
+  margin:22px 0;
+  display:flex;
+  justify-content:space-between;
+  font-size:23px;
   font-weight:800;
-  font-size:16px;
-  cursor:pointer;
 }
 
-.empty{
-  color:#666;
+.order-form{
+  display:grid;
+  gap:10px;
 }
 
-.notice{
-  padding:12px 18px;
-  background:#342719;
-  color:#ffd6ad;
-  border-bottom:1px solid #684522;
+.order-form input,
+.order-form select,
+.order-form textarea{
+  width:100%;
+  border:1px solid var(--border);
+  background:#1c1c1c;
+  color:white;
+  border-radius:10px;
+  padding:13px;
+  outline:none;
 }
 
-@media(max-width:560px){
-  .form{
-    grid-template-columns:1fr;
+.order-form textarea{
+  min-height:90px;
+  resize:vertical;
+}
+
+.whatsapp-button{
+  border:none;
+  border-radius:12px;
+  padding:15px;
+  background:var(--whatsapp);
+  color:white;
+  font-weight:800;
+  font-size:17px;
+}
+
+.cart-notice{
+  color:#9f9f9f;
+  font-size:13px;
+  line-height:1.45;
+  margin-top:12px;
+}
+
+/* FLOATING CART */
+
+.floating-cart{
+  position:fixed;
+  right:18px;
+  bottom:18px;
+  z-index:150;
+  height:60px;
+  min-width:60px;
+  border:none;
+  border-radius:30px;
+  background:white;
+  color:black;
+  padding:0 20px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  box-shadow:0 8px 28px rgba(0,0,0,.5);
+  font-weight:800;
+}
+
+.floating-count{
+  min-width:24px;
+  height:24px;
+  padding:0 6px;
+  border-radius:999px;
+  background:var(--danger);
+  color:white;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:12px;
+}
+
+/* RESPONSIVE */
+
+@media(min-width:700px){
+
+  .product-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:52px 30px;
   }
 
-  .section-head h2{
+  .shop-name{
+    display:block;
+  }
+
+}
+
+@media(min-width:1000px){
+
+  .product-grid{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+
+  .hero{
+    padding-top:50px;
+  }
+
+}
+
+@media(max-width:520px){
+
+  .header-main{
+    padding:10px 12px;
+  }
+
+  .logo-area img{
+    width:105px;
+  }
+
+  .preparation-time{
+    font-size:15px;
+    padding-left:14px;
+    padding-right:14px;
+  }
+
+  .category-wrapper{
+    top:101px;
+  }
+
+  .category-nav{
+    padding-left:12px;
+    padding-right:12px;
+  }
+
+  .category-button{
+    padding:11px 16px;
+    font-size:14px;
+  }
+
+  .hero h1{
     font-size:27px;
   }
 
-  .item h3{
-    font-size:19px;
+  .menu-section{
+    padding-left:12px;
+    padding-right:12px;
   }
 
-  .desc{
-    font-size:16px;
+  .section-title{
+    font-size:31px;
   }
+
+  .product-grid{
+    gap:38px 12px;
+  }
+
+  .product-name{
+    font-size:16px;
+    min-height:44px;
+  }
+
+  .product-price{
+    font-size:18px;
+  }
+
+  .add-button{
+    width:50px;
+    height:50px;
+    font-size:32px;
+  }
+
+  .info-button{
+    font-size:14px;
+  }
+
+  .info-symbol{
+    width:27px;
+    height:27px;
+  }
+
 }
+
 </style>
 </head>
 
 <body>
 
-<header>
+<header class="shop-header">
 
-  <div class="brand">
+  <div class="header-main">
 
-    <div>
-      <h1>🍣 NEBU Sushi</h1>
-      <small>Abholung per WhatsApp bestellen</small>
-    </div>
+    <div class="logo-area">
 
-    <div style="color:#ff7900;font-weight:800">
-      0157 30642210
-    </div>
+      <img
+        src="images/nebu-logo.png"
+        alt="NEBU Sushi Logo"
+      >
 
-  </div>
-
-  <input
-    class="search"
-    id="search"
-    type="search"
-    placeholder="Nach einem Artikel suchen"
-  >
-
-  <div class="categories" id="categoryNav"></div>
-
-</header>
-
-<main id="menu"></main>
-
-<div class="cart">
-
-  <div class="cart-inner">
-
-    <div class="cart-top">
-
-      <h2>Deine Bestellung</h2>
-
-      <div class="total" id="total">
-        0,00 €
+      <div class="shop-name">
+        <strong>NEBU Sushi</strong><br>
+        <small>Online bestellen</small>
       </div>
 
     </div>
 
-    <div class="cart-items" id="cartItems">
-      <span class="empty">
-        Noch keine Artikel ausgewählt.
-      </span>
-    </div>
-
-    <div class="form">
-
-      <input
-        id="customerName"
-        placeholder="Name *"
-      >
-
-      <input
-        id="pickupTime"
-        placeholder="Abholzeit * (z. B. 18:30)"
-      >
-
-      <input
-        id="phone"
-        placeholder="Telefonnummer (optional)"
-      >
-
-      <input
-        id="note"
-        placeholder="Anmerkung (optional)"
-      >
+    <div class="header-actions">
 
       <button
-        class="send"
-        onclick="sendWhatsApp()"
+        class="icon-button"
+        onclick="toggleSearch()"
+        aria-label="Suche öffnen"
       >
-        Bestellung per WhatsApp senden
+        🔍
+      </button>
+
+      <button
+        class="icon-button"
+        onclick="openCart()"
+        aria-label="Warenkorb öffnen"
+      >
+        🛒
+
+        <span
+          class="cart-badge"
+          id="headerCartBadge"
+        >
+          0
+        </span>
+
       </button>
 
     </div>
 
   </div>
 
+  <div class="search-container" id="searchContainer">
+
+    <input
+      id="searchInput"
+      type="search"
+      placeholder="Nach einem Artikel suchen"
+    >
+
+  </div>
+
+  <div class="preparation-time">
+
+    <div class="preparation-icon">
+      ◷
+    </div>
+
+    <span>
+      Aktuelle Zubereitungszeit:
+      <strong>ca. 35 Minuten</strong>
+    </span>
+
+  </div>
+
+</header>
+
+<div class="category-wrapper">
+
+  <nav
+    class="category-nav"
+    id="categoryNav"
+  ></nav>
+
+</div>
+
+<section class="hero">
+
+  <img
+    class="hero-logo"
+    src="images/nebu-logo.png"
+    alt="NEBU Sushi"
+  >
+
+  <h1>ONLINE BESTELLEN</h1>
+
+  <p>
+    Frisch zubereitet und bequem zur Abholung bestellen.
+  </p>
+
+</section>
+
+<main
+  class="menu-container"
+  id="menuContainer"
+></main>
+
+<button
+  class="floating-cart"
+  onclick="openCart()"
+>
+
+  🛒 Warenkorb
+
+  <span
+    class="floating-count"
+    id="floatingCartCount"
+  >
+    0
+  </span>
+
+</button>
+
+<div
+  class="modal-overlay"
+  id="productModalOverlay"
+  onclick="closeProductModalFromOverlay(event)"
+>
+
+  <div
+    class="product-modal"
+    id="productModal"
+  ></div>
+
+</div>
+
+<div
+  class="cart-overlay"
+  id="cartOverlay"
+  onclick="closeCartFromOverlay(event)"
+>
+
+  <aside class="cart-drawer">
+
+    <div class="cart-header">
+
+      <h2>Warenkorb</h2>
+
+      <button
+        class="close-cart"
+        onclick="closeCart()"
+      >
+        ✕
+      </button>
+
+    </div>
+
+    <div id="cartContent"></div>
+
+  </aside>
+
 </div>
 
 <script>
 
+/*
+====================================================
+MENÜ
+====================================================
+Bildnamen müssen im Ordner "images" liegen.
+Beispiel:
+images/edamame.png
+images/sake-maki.png
+====================================================
+*/
+
 const menu = [
 
-{
-  category:"Vorspeisen",
-  note:"",
-  items:[
+  {
+    category:"Vorspeisen",
+    items:[
 
-    [
-      "Miso Shiru (vegan)",
-      4.80,
-      "Traditionelle japanische Misosuppe mit zartem Tofu, Algen und Frühlingszwiebeln."
-    ],
+      {
+        name:"Miso Shiru (vegan)",
+        price:4.80,
+        description:"Traditionelle japanische Misosuppe mit zartem Tofu, Algen und Frühlingszwiebeln.",
+        image:"images/miso-shiru-vegan.png",
+        available:true
+      },
 
-    [
-      "Miso Shiru Sake",
-      5.00,
-      "Traditionelle japanische Misosuppe mit Lachs, Algen und Frühlingszwiebeln."
-    ],
+      {
+        name:"Miso Shiru Sake",
+        price:5.00,
+        description:"Traditionelle japanische Misosuppe mit Lachs, Algen und Frühlingszwiebeln.",
+        image:"images/miso-shiru-sake.png",
+        available:true
+      },
 
-    [
-      "Edamame",
-      5.00,
-      "Junge grüne Sojabohnen, schonend gekocht und leicht gesalzen."
-    ],
+      {
+        name:"Edamame",
+        price:5.00,
+        description:"Junge grüne Sojabohnen, schonend gekocht und leicht gesalzen.",
+        image:"images/edamame.png",
+        available:true
+      },
 
-    [
-      "Kimchi",
-      5.00,
-      "Traditionell fermentierter Chinakohl mit Knoblauch, Chili und Gewürzen, pikant-sauer."
-    ],
+      {
+        name:"Kimchi",
+        price:5.00,
+        description:"Traditionell fermentierter Chinakohl mit Knoblauch, Chili und Gewürzen.",
+        image:"images/kimchi.png",
+        available:true
+      },
 
-    [
-      "Goma Wakame (vegan)",
-      4.80,
-      "Marinierter Seetangsalat mit Sesam, frisch, leicht süßlich und herzhaft."
-    ],
+      {
+        name:"Goma Wakame (vegan)",
+        price:4.80,
+        description:"Marinierter Seetangsalat mit Sesam, frisch, leicht süßlich und herzhaft.",
+        image:"images/goma-wakame.png",
+        available:true
+      },
 
-    [
-      "Tori Gyoza (4 Stück)",
-      5.00,
-      "Japanische Teigtaschen mit Huhn und Gemüse, außen knusprig, innen saftig."
-    ],
+      {
+        name:"Tori Gyoza (4 Stück)",
+        price:5.00,
+        description:"Japanische Teigtaschen mit Huhn und Gemüse, außen knusprig und innen saftig.",
+        image:"images/tori-gyoza.png",
+        available:true
+      },
 
-    [
-      "Yasai Gyoza (4 Stück)",
-      5.00,
-      "Japanische Teigtaschen mit frischer Gemüsefüllung, knusprig gebraten."
+      {
+        name:"Yasai Gyoza (4 Stück)",
+        price:5.00,
+        description:"Japanische Teigtaschen mit Gemüsefüllung, knusprig gebraten.",
+        image:"images/yasai-gyoza.png",
+        available:true
+      }
+
     ]
+  },
 
-  ]
-},
+  {
+    category:"Bowls",
+    items:[
 
-{
-  category:"Bowls",
-  note:"",
-  items:[
+      {
+        name:"Sake Bowl",
+        price:15.00,
+        description:"Frische Bowl mit Lachs, Avocado, Goma Wakame, Edamame, Masago und Ingwer.",
+        image:"images/sake-bowl.png",
+        available:true
+      },
 
-    [
-      "Sake Bowl",
-      15.00,
-      "Frische Bowl mit Lachs, Avocado, Goma Wakame, Edamame, Masago und Ingwer."
-    ],
+      {
+        name:"Yasai Bowl",
+        price:12.00,
+        description:"Frische Bowl mit Möhren, Avocado, Goma Wakame, Edamame, Gurke und Sesam.",
+        image:"images/yasai-bowl.png",
+        available:true
+      },
 
-    [
-      "Yasai Bowl",
-      12.00,
-      "Frische Bowl mit Möhren, Avocado, Goma Wakame, Edamame, Gurke und Sesam."
-    ],
+      {
+        name:"Grill Salmon Bowl (scharf)",
+        price:17.80,
+        description:"Mit gebratenen Lachswürfeln in Teriyakisauce und scharf mariniertem Avocado-Salat.",
+        image:"images/grill-salmon-bowl.png",
+        available:true
+      }
 
-    [
-      "Grill Salmon Bowl (scharf)",
-      17.80,
-      "Mit gebratenen Lachswürfeln in Teriyakisauce und scharf mariniertem Avocado-Salat."
     ]
+  },
 
-  ]
-},
+  {
+    category:"Sashimi",
+    note:"Alle Gerichte werden mit Wasabi, Ingwer, Sojasauce und Stäbchen serviert.",
+    items:[
 
-{
-  category:"Sashimi - Sushi",
+      {
+        name:"Avocado Sashimi",
+        price:5.50,
+        description:"Frische Avocado in feinen Scheiben mit hausgemachter Sesamsauce.",
+        image:"images/avocado-sashimi.png",
+        available:true
+      },
 
-  note:"Alle Gerichte werden mit Wasabi, Ingwer, Sojasauce und Stäbchen serviert.",
+      {
+        name:"Sake Sashimi (6 Stück)",
+        price:0,
+        description:"Frischer Lachs.",
+        image:"images/sake-sashimi.png",
+        available:false
+      },
 
-  items:[
+      {
+        name:"Maguro Sashimi (6 Stück)",
+        price:0,
+        description:"Frischer Thunfisch.",
+        image:"images/maguro-sashimi.png",
+        available:false
+      }
 
-    [
-      "Avocado Sashimi",
-      5.50,
-      "Frische Avocado in feinen Scheiben, serviert mit hausgemachter Sesamsauce."
-    ],
-
-    [
-      "Sake Sashimi (6 Stück)",
-      0,
-      "Mit Lachs.",
-      false
-    ],
-
-    [
-      "Maguro Sashimi (6 Stück)",
-      0,
-      "Mit Thunfisch.",
-      false
     ]
+  },
 
-  ]
-},
+  {
+    category:"Maki",
+    note:"Es werden jeweils 6 Stück serviert.",
+    items:[
 
-{
-  category:"Maki - Sushi",
+      {
+        name:"Sake Avocado Maki",
+        price:5.00,
+        description:"Mit Lachs und Avocado.",
+        image:"images/sake-avocado-maki.png",
+        available:true
+      },
 
-  note:"Es werden jeweils 6 Stück serviert. Alle Gerichte werden mit Wasabi, Ingwer, Sojasauce und Stäbchen serviert.",
+      {
+        name:"Sake Maki",
+        price:4.80,
+        description:"Mit Lachs.",
+        image:"images/sake-maki.png",
+        available:true
+      },
 
-  items:[
+      {
+        name:"Sake Tatar Maki (scharf)",
+        price:4.80,
+        description:"Mit pikant mariniertem Lachs.",
+        image:"images/sake-tatar-maki.png",
+        available:true
+      },
 
-    [
-      "Sake Avocado Maki",
-      5.00,
-      "Mit Lachs und Avocado."
-    ],
+      {
+        name:"Maguro Maki",
+        price:6.50,
+        description:"Mit Thunfisch.",
+        image:"images/maguro-maki.png",
+        available:true
+      },
 
-    [
-      "Sake Maki",
-      4.80,
-      "Mit Lachs."
-    ],
+      {
+        name:"Maguro Tatar Maki (scharf)",
+        price:6.00,
+        description:"Mit pikant mariniertem Thunfisch.",
+        image:"images/maguro-tatar-maki.png",
+        available:true
+      },
 
-    [
-      "Sake Tatar Maki (scharf)",
-      4.80,
-      "Mit pikant mariniertem Lachs."
-    ],
+      {
+        name:"Maguro Kappa Maki",
+        price:6.00,
+        description:"Mit Thunfisch und Gurke.",
+        image:"images/maguro-kappa-maki.png",
+        available:true
+      },
 
-    [
-      "Maguro Maki",
-      6.50,
-      "Mit Thunfisch."
-    ],
+      {
+        name:"Kani Maki",
+        price:4.50,
+        description:"Mit Surimi.",
+        image:"images/kani-maki.png",
+        available:true
+      },
 
-    [
-      "Maguro Tatar Maki (scharf)",
-      6.00,
-      "Mit pikant mariniertem Thunfisch."
-    ],
+      {
+        name:"Kani Avocado Maki",
+        price:5.00,
+        description:"Mit Surimi und Avocado.",
+        image:"images/kani-avocado-maki.png",
+        available:true
+      },
 
-    [
-      "Maguro Kappa Maki",
-      6.00,
-      "Mit Thunfisch und Gurke."
-    ],
+      {
+        name:"Ebi Maki",
+        price:4.80,
+        description:"Mit gekochten Garnelen.",
+        image:"images/ebi-maki.png",
+        available:true
+      },
 
-    [
-      "Kani Maki",
-      4.50,
-      "Mit Surimi."
-    ],
+      {
+        name:"Ebi Avocado Maki",
+        price:5.00,
+        description:"Mit gekochten Garnelen und Avocado.",
+        image:"images/ebi-avocado-maki.png",
+        available:true
+      },
 
-    [
-      "Kani Avocado Maki",
-      5.00,
-      "Surimi mit Avocado."
-    ],
+      {
+        name:"Tamago Maki",
+        price:4.80,
+        description:"Mit japanischem Omelett.",
+        image:"images/tamago-maki.png",
+        available:true
+      },
 
-    [
-      "Ebi Maki",
-      4.80,
-      "Mit gekochten Garnelen."
-    ],
+      {
+        name:"Ninjin Maki",
+        price:4.00,
+        description:"Mit Möhre.",
+        image:"images/ninjin-maki.png",
+        available:true
+      },
 
-    [
-      "Ebi Avocado Maki",
-      5.00,
-      "Mit gekochten Garnelen und Avocado."
-    ],
+      {
+        name:"Kappa Maki",
+        price:4.00,
+        description:"Mit Gurke.",
+        image:"images/kappa-maki.png",
+        available:true
+      },
 
-    [
-      "Tamago Maki",
-      4.80,
-      "Mit japanischem Omelett."
-    ],
+      {
+        name:"Avocado Maki",
+        price:4.50,
+        description:"Mit Avocado.",
+        image:"images/avocado-maki.png",
+        available:true
+      },
 
-    [
-      "Ninjin Maki",
-      4.00,
-      "Mit Möhre."
-    ],
+      {
+        name:"Avocado Cream Maki",
+        price:4.80,
+        description:"Mit Avocado und Frischkäse.",
+        image:"images/avocado-cream-maki.png",
+        available:true
+      },
 
-    [
-      "Kappa Maki",
-      4.00,
-      "Mit Gurke."
-    ],
+      {
+        name:"Kampyo Maki",
+        price:4.30,
+        description:"Mit japanischem Kürbis.",
+        image:"images/kampyo-maki.png",
+        available:true
+      },
 
-    [
-      "Avocado Maki",
-      4.50,
-      "Mit Avocado."
-    ],
+      {
+        name:"Oshinko Maki",
+        price:4.30,
+        description:"Mit eingelegtem Rettich.",
+        image:"images/oshinko-maki.png",
+        available:true
+      }
 
-    [
-      "Avocado Cream Maki",
-      4.80,
-      "Mit Avocado und Frischkäse."
-    ],
-
-    [
-      "Kampyo Maki",
-      4.30,
-      "Mit japanischem Kürbis."
-    ],
-
-    [
-      "Oshinko Maki",
-      4.30,
-      "Mit eingelegtem Rettich."
     ]
+  },
 
-  ]
-},
+  {
+    category:"Nigiri",
+    note:"Es werden jeweils 2 Stück serviert.",
+    items:[
 
-{
-  category:"Nigiri - Sushi",
+      {
+        name:"Maguro Nigiri",
+        price:6.50,
+        description:"Thunfisch auf Sushi-Reis.",
+        image:"images/maguro-nigiri.png",
+        available:true
+      },
 
-  note:"Es werden jeweils 2 Stück serviert. Alle Gerichte werden mit Wasabi, Ingwer, Sojasauce und Stäbchen serviert.",
+      {
+        name:"Sake Nigiri",
+        price:4.80,
+        description:"Lachs auf Sushi-Reis.",
+        image:"images/sake-nigiri.png",
+        available:true
+      },
 
-  items:[
+      {
+        name:"Sake Aburi Nigiri",
+        price:6.50,
+        description:"Flambierter Lachs auf Sushi-Reis mit Teriyakisauce.",
+        image:"images/sake-aburi-nigiri.png",
+        available:true
+      },
 
-    [
-      "Maguro Nigiri",
-      6.50,
-      "Thunfisch auf Sushi-Reis."
-    ],
+      {
+        name:"Ebi Nigiri",
+        price:5.50,
+        description:"Garnele auf Sushi-Reis.",
+        image:"images/ebi-nigiri.png",
+        available:true
+      },
 
-    [
-      "Sake Nigiri",
-      4.80,
-      "Lachs auf Sushi-Reis."
-    ],
+      {
+        name:"Kani Nigiri",
+        price:4.50,
+        description:"Surimi auf Sushi-Reis.",
+        image:"images/kani-nigiri.png",
+        available:true
+      },
 
-    [
-      "Sake Aburi Nigiri",
-      6.50,
-      "Flambierter Lachs auf Sushi-Reis mit Teriyakisauce."
-    ],
+      {
+        name:"Tamago Nigiri",
+        price:4.50,
+        description:"Japanisches Omelett auf Sushi-Reis.",
+        image:"images/tamago-nigiri.png",
+        available:true
+      },
 
-    [
-      "Ebi Nigiri",
-      5.50,
-      "Garnele auf Sushi-Reis."
-    ],
+      {
+        name:"Avocado Nigiri",
+        price:4.50,
+        description:"Avocado auf Sushi-Reis.",
+        image:"images/avocado-nigiri.png",
+        available:true
+      },
 
-    [
-      "Kani Nigiri",
-      4.50,
-      "Surimi auf Sushi-Reis."
-    ],
+      {
+        name:"Sake Tatar Gunkan (scharf)",
+        price:6.50,
+        description:"Seetang-Reisröllchen mit mariniertem Lachs-Tatar.",
+        image:"images/sake-tatar-gunkan.png",
+        available:true
+      },
 
-    [
-      "Tamago Nigiri",
-      4.50,
-      "Japanisches Omelett auf Sushi-Reis, vegetarisch."
-    ],
+      {
+        name:"Tekka Tatar Gunkan (scharf)",
+        price:8.00,
+        description:"Seetang-Reisröllchen mit mariniertem Thunfisch-Tatar.",
+        image:"images/tekka-tatar-gunkan.png",
+        available:true
+      },
 
-    [
-      "Avocado Nigiri",
-      4.50,
-      "Avocadoscheiben auf Sushi-Reis, vegetarisch."
-    ],
+      {
+        name:"Inari Nigiri",
+        price:4.50,
+        description:"Süße Tofutasche mit Sushi-Reis.",
+        image:"images/inari-nigiri.png",
+        available:true
+      },
 
-    [
-      "Sake Tatar Gunkan (scharf)",
-      6.50,
-      "Seetang-Reisröllchen mit mariniertem Lachs-Tatar."
-    ],
+      {
+        name:"Ikura Gunkan",
+        price:0,
+        description:"Mit Lachskaviar.",
+        image:"images/ikura-gunkan.png",
+        available:false
+      }
 
-    [
-      "Tekka Tatar Gunkan (scharf)",
-      8.00,
-      "Seetang-Reisröllchen mit mariniertem Thunfisch-Tatar."
-    ],
-
-    [
-      "Inari Nigiri",
-      4.50,
-      "Süße Tofutasche mit Sushi-Reis, vegetarisch."
-    ],
-
-    [
-      "Ikura Gunkan",
-      0,
-      "Mit Lachskaviar.",
-      false
     ]
+  },
 
-  ]
-},
+  {
+    category:"Inside Out",
+    note:"Es werden jeweils 8 Stück serviert.",
+    items:[
 
-{
-  category:"Inside Out - Sushi",
+      {
+        name:"California Roll",
+        price:9.50,
+        description:"Mit Surimi, Avocado, Gurke, Mayonnaise und Masago.",
+        image:"images/california-roll.png",
+        available:true
+      },
 
-  note:"Es werden jeweils 8 Stück serviert. Alle Gerichte werden mit Wasabi, Ingwer, Sojasauce und Stäbchen serviert.",
+      {
+        name:"Sake Roll",
+        price:9.80,
+        description:"Mit Lachs, Avocado, Mayonnaise und Masago.",
+        image:"images/sake-roll.png",
+        available:true
+      }
 
-  items:[
-
-    [
-      "California Roll",
-      9.50,
-      "Mit Surimi, Avocado, Gurke, Mayonnaise und Masago."
-    ],
-
-    [
-      "Sake Roll",
-      9.80,
-      "Mit Lachs, Avocado, Mayonnaise und Masago."
     ]
-
-  ]
-}
+  }
 
 ];
 
 let cart = {};
+
+let activeModalProduct = null;
+
+/*
+====================================================
+HILFSFUNKTIONEN
+====================================================
+*/
 
 function euro(value){
 
@@ -720,36 +1359,63 @@ function euro(value){
 
 }
 
-function idFor(text){
+function createSectionId(category){
 
-  return "cat-" + text
-    .toLowerCase()
-    .replace(/[^a-z0-9äöüß]+/gi,"-");
-
-}
-
-function renderNav(){
-
-  const nav = document.getElementById("categoryNav");
-
-  nav.innerHTML = menu.map((category,index)=>`
-
-    <button
-      onclick="goTo('${idFor(category.category)}')"
-      class="${index === 0 ? "active" : ""}"
-    >
-
-      ${category.category}
-
-    </button>
-
-  `).join("");
+  return "section-" +
+    category
+      .toLowerCase()
+      .replace(/ä/g,"ae")
+      .replace(/ö/g,"oe")
+      .replace(/ü/g,"ue")
+      .replace(/ß/g,"ss")
+      .replace(/[^a-z0-9]+/g,"-");
 
 }
 
-function goTo(id){
+function createProductKey(category,name){
 
-  const section = document.getElementById(id);
+  return category + "||" + name;
+
+}
+
+/*
+====================================================
+KATEGORIEN
+====================================================
+*/
+
+function renderCategoryNavigation(){
+
+  const navigation =
+    document.getElementById("categoryNav");
+
+  navigation.innerHTML =
+    menu.map((section,index)=>{
+
+      return `
+
+        <button
+          class="category-button ${index === 0 ? "active" : ""}"
+          onclick="scrollToCategory(
+            '${createSectionId(section.category)}',
+            this
+          )"
+        >
+
+          ${section.category}
+
+        </button>
+
+      `;
+
+    }).join("");
+
+}
+
+function scrollToCategory(sectionId,button){
+
+  const section =
+    document.getElementById(sectionId);
 
   if(section){
 
@@ -760,141 +1426,206 @@ function goTo(id){
 
   }
 
-}
-
-function renderMenu(filter=""){
-
-  const root = document.getElementById("menu");
-
-  root.innerHTML = "";
-
-  const searchTerm = filter
-    .trim()
-    .toLowerCase();
-
-  menu.forEach(category=>{
-
-    const matchingItems = category.items.filter(item=>{
-
-      const searchableText =
-        item[0] + " " + item[2];
-
-      return !searchTerm ||
-        searchableText
-          .toLowerCase()
-          .includes(searchTerm);
-
+  document
+    .querySelectorAll(".category-button")
+    .forEach(item=>{
+      item.classList.remove("active");
     });
 
-    if(!matchingItems.length){
+  button.classList.add("active");
+
+}
+
+/*
+====================================================
+MENÜ RENDERN
+====================================================
+*/
+
+function renderMenu(searchTerm=""){
+
+  const container =
+    document.getElementById("menuContainer");
+
+  const normalizedSearch =
+    searchTerm
+      .trim()
+      .toLowerCase();
+
+  container.innerHTML = "";
+
+  menu.forEach(section=>{
+
+    const filteredItems =
+      section.items.filter(product=>{
+
+        const searchableText =
+          product.name +
+          " " +
+          product.description;
+
+        return !normalizedSearch ||
+          searchableText
+            .toLowerCase()
+            .includes(normalizedSearch);
+
+      });
+
+    if(filteredItems.length === 0){
       return;
     }
 
-    const section = document.createElement("section");
+    const sectionElement =
+      document.createElement("section");
 
-    section.id = idFor(category.category);
+    sectionElement.className =
+      "menu-section";
 
-    section.innerHTML = `
+    sectionElement.id =
+      createSectionId(section.category);
 
-      <div class="section-head">
+    sectionElement.innerHTML = `
 
-        <h2>${category.category}</h2>
+      <h2 class="section-title">
+        ${section.category}
+      </h2>
 
-        ${category.note
-          ? `<p>${category.note}</p>`
+      ${
+        section.note
+          ? `
+            <p class="section-note">
+              ${section.note}
+            </p>
+          `
           : ""
-        }
+      }
 
-      </div>
+      <div class="product-grid"></div>
 
     `;
 
-    matchingItems.forEach(item=>{
+    const productGrid =
+      sectionElement.querySelector(".product-grid");
 
-      const [
-        name,
-        price,
-        description,
-        available = true
-      ] = item;
+    filteredItems.forEach(product=>{
 
-      const key =
-        category.category + "||" + name;
-
-      const article =
-        document.createElement("div");
-
-      article.className =
-        "item" +
-        (available === false
-          ? " unavailable"
-          : ""
+      const productKey =
+        createProductKey(
+          section.category,
+          product.name
         );
 
-      article.innerHTML = `
+      const productCard =
+        document.createElement("article");
 
-        <div>
+      productCard.className =
+        "product-card" +
+        (
+          product.available
+            ? ""
+            : " unavailable"
+        );
 
-          <h3>${name}</h3>
+      productCard.innerHTML = `
+
+        <div class="product-image-wrapper">
+
+          <img
+            class="product-image"
+            src="${product.image}"
+            alt="${product.name}"
+            onerror="showImageFallback(this)"
+          >
 
           ${
-            available === false
+            product.available
+              ? `
+                <button
+                  class="add-button"
+                  onclick='addProduct(
+                    ${JSON.stringify(productKey)},
+                    ${JSON.stringify(product.name)},
+                    ${product.price}
+                  )'
+                  aria-label="${product.name} hinzufügen"
+                >
+                  +
+                </button>
+              `
+              : ""
+          }
 
+        </div>
+
+        <h3 class="product-name">
+          ${product.name}
+        </h3>
+
+        ${
+          product.available
             ? `
+              <div class="product-price">
+                ${euro(product.price)}
+              </div>
+            `
+            : `
               <div class="unavailable-label">
                 Nicht verfügbar
               </div>
             `
+        }
 
-            : `
-              <div class="price">
-                ${euro(price)}
-              </div>
-            `
-          }
+        <div class="product-actions">
 
-          <div class="desc">
-            ${description}
-          </div>
+          <button
+            class="favorite-button"
+            type="button"
+            aria-label="Favorit"
+          >
+            ♡
+          </button>
+
+          <button
+            class="info-button"
+            type="button"
+            onclick='openProductModal(
+              ${JSON.stringify(section.category)},
+              ${JSON.stringify(product.name)}
+            )'
+          >
+
+            <span class="info-symbol">
+              i
+            </span>
+
+            Produktinfo
+
+          </button>
 
         </div>
 
-        ${
-          available === false
-
-          ? ""
-
-          : `
-            <button
-              class="add"
-              aria-label="${name} hinzufügen"
-              onclick='addItem(
-                ${JSON.stringify(key)},
-                ${JSON.stringify(name)},
-                ${price}
-              )'
-            >
-              +
-            </button>
-          `
-        }
-
       `;
 
-      section.appendChild(article);
+      productGrid.appendChild(productCard);
 
     });
 
-    root.appendChild(section);
+    container.appendChild(sectionElement);
 
   });
 
-  if(!root.children.length){
+  if(container.children.length === 0){
 
-    root.innerHTML = `
+    container.innerHTML = `
 
-      <div class="notice">
+      <div style="
+        padding:60px 20px;
+        text-align:center;
+        color:#aaaaaa;
+      ">
+
         Keine passenden Artikel gefunden.
+
       </div>
 
     `;
@@ -903,89 +1634,391 @@ function renderMenu(filter=""){
 
 }
 
-function addItem(key,name,price){
+function showImageFallback(image){
+
+  const fallback =
+    document.createElement("div");
+
+  fallback.className =
+    "image-fallback";
+
+  fallback.textContent =
+    "🍣";
+
+  image.replaceWith(fallback);
+
+}
+
+/*
+====================================================
+SUCHE
+====================================================
+*/
+
+function toggleSearch(){
+
+  const searchContainer =
+    document.getElementById("searchContainer");
+
+  searchContainer.classList.toggle("open");
+
+  if(searchContainer.classList.contains("open")){
+
+    document
+      .getElementById("searchInput")
+      .focus();
+
+  }
+
+}
+
+document
+  .getElementById("searchInput")
+  .addEventListener(
+    "input",
+    event=>{
+
+      renderMenu(event.target.value);
+
+    }
+  );
+
+/*
+====================================================
+PRODUKTINFO
+====================================================
+*/
+
+function findProduct(category,name){
+
+  const section =
+    menu.find(item=>
+      item.category === category
+    );
+
+  if(!section){
+    return null;
+  }
+
+  return section.items.find(item=>
+    item.name === name
+  );
+
+}
+
+function openProductModal(category,name){
+
+  const product =
+    findProduct(category,name);
+
+  if(!product){
+    return;
+  }
+
+  activeModalProduct = {
+    category,
+    ...product
+  };
+
+  const modal =
+    document.getElementById("productModal");
+
+  modal.innerHTML = `
+
+    <button
+      class="modal-close"
+      onclick="closeProductModal()"
+    >
+      ✕
+    </button>
+
+    <img
+      class="modal-image"
+      src="${product.image}"
+      alt="${product.name}"
+      onerror="this.style.display='none'"
+    >
+
+    <h2>
+      ${product.name}
+    </h2>
+
+    ${
+      product.available
+        ? `
+          <div class="modal-price">
+            ${euro(product.price)}
+          </div>
+        `
+        : `
+          <div class="unavailable-label">
+            Nicht verfügbar
+          </div>
+        `
+    }
+
+    <p class="modal-description">
+      ${product.description}
+    </p>
+
+    ${
+      product.available
+        ? `
+          <button
+            class="modal-add"
+            onclick="addActiveModalProduct()"
+          >
+            Zum Warenkorb hinzufügen
+          </button>
+        `
+        : ""
+    }
+
+  `;
+
+  document
+    .getElementById("productModalOverlay")
+    .classList
+    .add("open");
+
+  document.body.style.overflow =
+    "hidden";
+
+}
+
+function closeProductModal(){
+
+  document
+    .getElementById("productModalOverlay")
+    .classList
+    .remove("open");
+
+  document.body.style.overflow =
+    "";
+
+  activeModalProduct = null;
+
+}
+
+function closeProductModalFromOverlay(event){
+
+  if(
+    event.target.id ===
+    "productModalOverlay"
+  ){
+
+    closeProductModal();
+
+  }
+
+}
+
+function addActiveModalProduct(){
+
+  if(!activeModalProduct){
+    return;
+  }
+
+  const productKey =
+    createProductKey(
+      activeModalProduct.category,
+      activeModalProduct.name
+    );
+
+  addProduct(
+    productKey,
+    activeModalProduct.name,
+    activeModalProduct.price
+  );
+
+  closeProductModal();
+
+}
+
+/*
+====================================================
+WARENKORB
+====================================================
+*/
+
+function addProduct(key,name,price){
 
   if(!cart[key]){
 
     cart[key] = {
-      name:name,
-      price:price,
-      qty:0
+      name,
+      price,
+      quantity:0
     };
 
   }
 
-  cart[key].qty++;
+  cart[key].quantity++;
 
-  renderCart();
+  updateCartIndicators();
 
 }
 
-function changeQty(key,change){
+function changeQuantity(key,change){
 
   if(!cart[key]){
     return;
   }
 
-  cart[key].qty += change;
+  cart[key].quantity += change;
 
-  if(cart[key].qty <= 0){
+  if(cart[key].quantity <= 0){
 
     delete cart[key];
 
   }
 
+  updateCartIndicators();
+
   renderCart();
+
+}
+
+function getCartQuantity(){
+
+  return Object
+    .values(cart)
+    .reduce(
+      (total,item)=>
+        total + item.quantity,
+      0
+    );
+
+}
+
+function getCartTotal(){
+
+  return Object
+    .values(cart)
+    .reduce(
+      (total,item)=>
+        total +
+        (
+          item.price *
+          item.quantity
+        ),
+      0
+    );
+
+}
+
+function updateCartIndicators(){
+
+  const quantity =
+    getCartQuantity();
+
+  document
+    .getElementById("headerCartBadge")
+    .textContent =
+      quantity;
+
+  document
+    .getElementById("floatingCartCount")
+    .textContent =
+      quantity;
+
+}
+
+function openCart(){
+
+  renderCart();
+
+  document
+    .getElementById("cartOverlay")
+    .classList
+    .add("open");
+
+  document.body.style.overflow =
+    "hidden";
+
+}
+
+function closeCart(){
+
+  document
+    .getElementById("cartOverlay")
+    .classList
+    .remove("open");
+
+  document.body.style.overflow =
+    "";
+
+}
+
+function closeCartFromOverlay(event){
+
+  if(
+    event.target.id ===
+    "cartOverlay"
+  ){
+
+    closeCart();
+
+  }
 
 }
 
 function renderCart(){
 
-  const cartBox =
-    document.getElementById("cartItems");
+  const cartContent =
+    document.getElementById("cartContent");
 
-  const items =
+  const entries =
     Object.entries(cart);
 
-  if(!items.length){
+  if(entries.length === 0){
 
-    cartBox.innerHTML = `
+    cartContent.innerHTML = `
 
-      <span class="empty">
-        Noch keine Artikel ausgewählt.
-      </span>
+      <div class="cart-empty">
+
+        Dein Warenkorb ist noch leer.
+
+      </div>
 
     `;
-
-    document.getElementById("total")
-      .textContent = "0,00 €";
 
     return;
 
   }
 
-  let total = 0;
-
-  cartBox.innerHTML =
-    items.map(([key,item])=>{
+  const itemsHtml =
+    entries.map(([key,item])=>{
 
       const itemTotal =
-        item.price * item.qty;
-
-      total += itemTotal;
+        item.price *
+        item.quantity;
 
       return `
 
         <div class="cart-row">
 
-          <span>
-            ${item.qty}× ${item.name}
-          </span>
+          <div class="cart-row-top">
 
-          <span class="qty">
+            <div class="cart-row-name">
+
+              ${item.quantity}×
+              ${item.name}
+
+            </div>
+
+            <div class="cart-row-price">
+
+              ${euro(itemTotal)}
+
+            </div>
+
+          </div>
+
+          <div class="quantity-control">
 
             <button
-              onclick='changeQty(
+              onclick='changeQuantity(
                 ${JSON.stringify(key)},
                 -1
               )'
@@ -993,10 +2026,12 @@ function renderCart(){
               −
             </button>
 
-            ${euro(itemTotal)}
+            <span>
+              ${item.quantity}
+            </span>
 
             <button
-              onclick='changeQty(
+              onclick='changeQuantity(
                 ${JSON.stringify(key)},
                 1
               )'
@@ -1004,7 +2039,7 @@ function renderCart(){
               +
             </button>
 
-          </span>
+          </div>
 
         </div>
 
@@ -1012,12 +2047,97 @@ function renderCart(){
 
     }).join("");
 
-  document.getElementById("total")
-    .textContent = euro(total);
+  cartContent.innerHTML = `
+
+    ${itemsHtml}
+
+    <div class="cart-total">
+
+      <span>Gesamt</span>
+
+      <span>
+        ${euro(getCartTotal())}
+      </span>
+
+    </div>
+
+    <div class="order-form">
+
+      <input
+        id="customerName"
+        type="text"
+        placeholder="Name *"
+      >
+
+      <input
+        id="customerPhone"
+        type="tel"
+        placeholder="Telefonnummer *"
+      >
+
+      <select id="pickupTime">
+
+        <option value="">
+          Abholzeit auswählen *
+        </option>
+
+        <option value="Schnellstmöglich">
+          Schnellstmöglich
+        </option>
+
+        <option value="In 30 Minuten">
+          In 30 Minuten
+        </option>
+
+        <option value="In 40 Minuten">
+          In 40 Minuten
+        </option>
+
+        <option value="In 50 Minuten">
+          In 50 Minuten
+        </option>
+
+        <option value="In 60 Minuten">
+          In 60 Minuten
+        </option>
+
+      </select>
+
+      <textarea
+        id="orderNote"
+        placeholder="Anmerkung zur Bestellung"
+      ></textarea>
+
+      <button
+        class="whatsapp-button"
+        onclick="sendWhatsAppOrder()"
+      >
+
+        Bestellung per WhatsApp senden
+
+      </button>
+
+      <div class="cart-notice">
+
+        Die Bestellung ist erst verbindlich,
+        nachdem NEBU Sushi sie per WhatsApp
+        bestätigt hat.
+
+      </div>
+
+    </div>
+
+  `;
 
 }
 
-function sendWhatsApp(){
+/*
+====================================================
+WHATSAPP-BESTELLUNG
+====================================================
+*/
+
+function sendWhatsAppOrder(){
 
   const name =
     document
@@ -1025,60 +2145,72 @@ function sendWhatsApp(){
       .value
       .trim();
 
+  const phone =
+    document
+      .getElementById("customerPhone")
+      .value
+      .trim();
+
   const pickupTime =
     document
       .getElementById("pickupTime")
-      .value
-      .trim();
-
-  const phone =
-    document
-      .getElementById("phone")
-      .value
-      .trim();
+      .value;
 
   const note =
     document
-      .getElementById("note")
+      .getElementById("orderNote")
       .value
       .trim();
 
-  const items =
-    Object.values(cart);
-
-  if(!items.length){
+  if(!name){
 
     alert(
-      "Bitte zuerst mindestens einen Artikel auswählen."
+      "Bitte deinen Namen eintragen."
     );
 
     return;
 
   }
 
-  if(!name || !pickupTime){
+  if(!phone){
 
     alert(
-      "Bitte Name und Abholzeit eintragen."
+      "Bitte deine Telefonnummer eintragen."
     );
 
     return;
 
   }
 
-  let total = 0;
+  if(!pickupTime){
+
+    alert(
+      "Bitte eine Abholzeit auswählen."
+    );
+
+    return;
+
+  }
 
   const orderLines =
-    items.map(item=>{
+    Object
+      .values(cart)
+      .map(item=>{
 
-      const itemTotal =
-        item.price * item.qty;
+        const itemTotal =
+          item.price *
+          item.quantity;
 
-      total += itemTotal;
+        return (
+          "• " +
+          item.quantity +
+          "× " +
+          item.name +
+          " – " +
+          euro(itemTotal)
+        );
 
-      return `• ${item.qty}× ${item.name} – ${euro(itemTotal)}`;
-
-    });
+      });
 
   const message = [
 
@@ -1086,31 +2218,35 @@ function sendWhatsApp(){
 
     "",
 
-    `Name: ${name}`,
-
-    `Abholzeit: ${pickupTime}`,
-
-    phone
-      ? `Telefon: ${phone}`
-      : "",
+    "ich möchte gerne folgende Bestellung zur Abholung aufgeben:",
 
     "",
-
-    "Bestellung:",
 
     ...orderLines,
 
     "",
 
-    `Gesamt: ${euro(total)}`,
+    "Gesamt: " +
+      euro(getCartTotal()),
+
+    "",
+
+    "Name: " +
+      name,
+
+    "Telefonnummer: " +
+      phone,
+
+    "Gewünschte Abholzeit: " +
+      pickupTime,
 
     note
-      ? `Anmerkung: ${note}`
+      ? "Anmerkung: " + note
       : "",
 
     "",
 
-    "Bitte die Bestellung kurz bestätigen. Vielen Dank!"
+    "Bitte bestätigt mir die Bestellung kurz. Vielen Dank!"
 
   ]
   .filter(Boolean)
@@ -1132,18 +2268,17 @@ function sendWhatsApp(){
 
 }
 
-document
-  .getElementById("search")
-  .addEventListener(
-    "input",
-    event=>{
-      renderMenu(event.target.value);
-    }
-  );
+/*
+====================================================
+START
+====================================================
+*/
 
-renderNav();
+renderCategoryNavigation();
+
 renderMenu();
-renderCart();
+
+updateCartIndicators();
 
 </script>
 
