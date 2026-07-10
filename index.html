@@ -183,7 +183,7 @@ button{
 
 .category-wrapper{
   position:sticky;
-  top:111px;
+  top:var(--header-height,111px);
   z-index:90;
   background:#000;
   border-bottom:1px solid var(--border);
@@ -205,20 +205,21 @@ button{
 
 .category-button{
   flex:none;
-  border:2px solid white;
+  border:2px solid var(--gold);
   border-radius:15px;
   padding:13px 20px;
-  background:var(--gold-soft);
-  color:white;
+  background:#000000;
+  color:var(--gold);
   font-size:16px;
+  font-weight:700;
   letter-spacing:.3px;
   text-transform:uppercase;
   white-space:nowrap;
 }
 
 .category-button.active{
-  background:white;
-  color:#7a7a70;
+  background:var(--gold);
+  color:#000000;
 }
 
 /* HERO */
@@ -258,7 +259,7 @@ button{
 
 .menu-section{
   padding:20px 18px 10px;
-  scroll-margin-top:190px;
+  scroll-margin-top:var(--sticky-offset,190px);
 }
 
 .section-title{
@@ -707,10 +708,6 @@ button{
     font-size:15px;
     padding-left:14px;
     padding-right:14px;
-  }
-
-  .category-wrapper{
-    top:101px;
   }
 
   .category-nav{
@@ -1670,6 +1667,8 @@ function toggleSearch(){
 
   }
 
+  adjustStickyOffsets();
+
 }
 
 document
@@ -2274,11 +2273,54 @@ START
 ====================================================
 */
 
+function adjustStickyOffsets(){
+
+  const header =
+    document.querySelector(".shop-header");
+
+  const wrapper =
+    document.querySelector(".category-wrapper");
+
+  if(!header || !wrapper){
+    return;
+  }
+
+  const headerHeight =
+    header.offsetHeight;
+
+  document.documentElement.style.setProperty(
+    "--header-height",
+    headerHeight + "px"
+  );
+
+  document.documentElement.style.setProperty(
+    "--sticky-offset",
+    (
+      headerHeight +
+      wrapper.offsetHeight +
+      14
+    ) + "px"
+  );
+
+}
+
+window.addEventListener(
+  "load",
+  adjustStickyOffsets
+);
+
+window.addEventListener(
+  "resize",
+  adjustStickyOffsets
+);
+
 renderCategoryNavigation();
 
 renderMenu();
 
 updateCartIndicators();
+
+adjustStickyOffsets();
 
 </script>
 
