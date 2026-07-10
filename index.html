@@ -1643,16 +1643,46 @@ function cleanProductName(name){
 
 function imageCandidates(product){
 
-  const clean =
-    cleanProductName(product.name);
+  const raw =
+    product.name.trim();
 
-  const list = [
-    "images/" + clean + ".jpg",
-    "images/" + clean + ".png",
-    "images/" + clean + ".jpeg",
-    "images/" + clean + ".JPG",
-    "images/" + clean + ".PNG"
+  const clean =
+    cleanProductName(raw);
+
+  const nameVariants = [
+    clean,
+    raw,
+    clean.toUpperCase(),
+    raw.toUpperCase()
   ];
+
+  const extensions = [
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".JPG",
+    ".JPEG",
+    ".PNG"
+  ];
+
+  const list = [];
+
+  nameVariants.forEach(variant=>{
+
+    extensions.forEach(extension=>{
+
+      const path =
+        "images/" + variant + extension;
+
+      if(!list.includes(path)){
+
+        list.push(path);
+
+      }
+
+    });
+
+  });
 
   if(
     product.image &&
