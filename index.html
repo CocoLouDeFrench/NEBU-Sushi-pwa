@@ -1529,9 +1529,10 @@ function renderMenu(searchTerm=""){
 
           <img
             class="product-image"
-            src="${product.image}"
+            src="${imageCandidates(product)[0]}"
             alt="${product.name}"
-            onerror="showImageFallback(this)"
+            data-candidates='${JSON.stringify(imageCandidates(product).slice(1))}'
+            onerror="tryNextImage(this)"
           >
 
           ${
@@ -1628,6 +1629,84 @@ function renderMenu(searchTerm=""){
     `;
 
   }
+
+}
+
+function cleanProductName(name){
+
+  return name
+    .replace(/\s*\(.*?\)\s*/g," ")
+    .replace(/\s+/g," ")
+    .trim();
+
+}
+
+function imageCandidates(product){
+
+  const clean =
+    cleanProductName(product.name);
+
+  const list = [
+    "images/" + clean + ".jpg",
+    "images/" + clean + ".png",
+    "images/" + clean + ".jpeg",
+    "images/" + clean + ".JPG",
+    "images/" + clean + ".PNG"
+  ];
+
+  if(
+    product.image &&
+    !list.includes(product.image)
+  ){
+
+    list.push(product.image);
+
+  }
+
+  return list;
+
+}
+
+function tryNextImage(image){
+
+  let candidates = [];
+
+  try{
+
+    candidates =
+      JSON.parse(
+        image.dataset.candidates || "[]"
+      );
+
+  }catch(error){
+
+    candidates = [];
+
+  }
+
+  if(candidates.length === 0){
+
+    if(image.dataset.mode === "modal"){
+
+      image.style.display = "none";
+
+    }else{
+
+      showImageFallback(image);
+
+    }
+
+    return;
+
+  }
+
+  const next =
+    candidates.shift();
+
+  image.dataset.candidates =
+    JSON.stringify(candidates);
+
+  image.src = next;
 
 }
 
@@ -1733,9 +1812,11 @@ function openProductModal(category,name){
 
     <img
       class="modal-image"
-      src="${product.image}"
+      src="${imageCandidates(product)[0]}"
       alt="${product.name}"
-      onerror="this.style.display='none'"
+      data-mode="modal"
+      data-candidates='${JSON.stringify(imageCandidates(product).slice(1))}'
+      onerror="tryNextImage(this)"
     >
 
     <h2>
