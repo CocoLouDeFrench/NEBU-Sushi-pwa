@@ -322,13 +322,13 @@ button{
   position:absolute;
   right:5%;
   top:6%;
-  width:56px;
-  height:56px;
+  width:42px;
+  height:42px;
   border-radius:50%;
   border:none;
   background:white;
   color:var(--gold-soft);
-  font-size:38px;
+  font-size:26px;
   font-weight:300;
   line-height:1;
   box-shadow:0 4px 14px rgba(0,0,0,.35);
@@ -739,9 +739,9 @@ button{
   }
 
   .add-button{
-    width:50px;
-    height:50px;
-    font-size:32px;
+    width:36px;
+    height:36px;
+    font-size:22px;
   }
 
   .info-badge{
@@ -769,8 +769,10 @@ button{
     <div class="logo-area">
 
       <img
+        id="headerLogo"
         src="nebu-logo.png"
         alt="NEBU Sushi Logo"
+        onclick="handleLogoTap()"
       >
 
       <div class="shop-name">
@@ -787,7 +789,10 @@ button{
         onclick="toggleSearch()"
         aria-label="Suche öffnen"
       >
-        🔍
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+          <line x1="16.6" y1="16.6" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
       </button>
 
       <button
@@ -795,7 +800,11 @@ button{
         onclick="openCart()"
         aria-label="Warenkorb öffnen"
       >
-        🛒
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 4h2l2.2 12.2a2 2 0 0 0 2 1.8h7.6a2 2 0 0 0 2-1.6L20.5 8H6.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="10" cy="21" r="1.4" fill="currentColor"/>
+          <circle cx="18" cy="21" r="1.4" fill="currentColor"/>
+        </svg>
 
         <span
           class="cart-badge"
@@ -870,7 +879,13 @@ button{
   onclick="openCart()"
 >
 
-  🛒 Warenkorb
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 4h2l2.2 12.2a2 2 0 0 0 2 1.8h7.6a2 2 0 0 0 2-1.6L20.5 8H6.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="10" cy="21" r="1.4" fill="currentColor"/>
+    <circle cx="18" cy="21" r="1.4" fill="currentColor"/>
+  </svg>
+
+  Warenkorb
 
   <span
     class="floating-count"
@@ -918,6 +933,67 @@ button{
     <div id="cartContent"></div>
 
   </aside>
+
+</div>
+
+<div
+  class="modal-overlay"
+  id="adminLoginOverlay"
+  onclick="closeAdminLoginFromOverlay(event)"
+>
+
+  <div class="product-modal">
+
+    <button
+      class="modal-close"
+      onclick="closeAdminLogin()"
+    >
+      ✕
+    </button>
+
+    <h2>Admin-Zugang</h2>
+
+    <p class="modal-description">
+      Bitte Passwort eingeben, um Zubereitungszeit
+      und Verfügbarkeit zu bearbeiten.
+    </p>
+
+    <input
+      id="adminPasswordInput"
+      type="password"
+      placeholder="Passwort"
+      style="width:100%;margin-top:14px;padding:14px;border-radius:10px;border:1px solid var(--border);background:#1c1c1c;color:white;"
+    >
+
+    <div
+      id="adminLoginError"
+      style="color:var(--danger);margin-top:10px;display:none;"
+    >
+      Falsches Passwort.
+    </div>
+
+    <button
+      class="modal-add"
+      onclick="submitAdminLogin()"
+    >
+      Anmelden
+    </button>
+
+  </div>
+
+</div>
+
+<div
+  class="modal-overlay"
+  id="adminPanelOverlay"
+  onclick="closeAdminPanelFromOverlay(event)"
+>
+
+  <div
+    class="product-modal"
+    id="adminPanel"
+    style="max-width:720px;"
+  ></div>
 
 </div>
 
@@ -2040,8 +2116,13 @@ function showImageFallback(image){
   fallback.className =
     "image-fallback";
 
-  fallback.textContent =
-    "🍣";
+  fallback.innerHTML =
+    `<svg width="44%" height="44%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="12" cy="16" rx="9" ry="3" stroke="currentColor" stroke-width="1.5"/>
+      <path d="M3 16c0 3.5 4 6 9 6s9-2.5 9-6" stroke="currentColor" stroke-width="1.5"/>
+      <line x1="12" y1="3" x2="12" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="9" y1="5" x2="9" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>`;
 
   image.replaceWith(fallback);
 
@@ -2717,6 +2798,368 @@ window.addEventListener(
   adjustStickyOffsets
 );
 
+/*
+====================================================
+ADMIN-BEREICH
+====================================================
+*/
+
+let logoTapCount = 0;
+
+let logoTapTimer = null;
+
+let adminPassword = null;
+
+function handleLogoTap(){
+
+  logoTapCount++;
+
+  clearTimeout(logoTapTimer);
+
+  logoTapTimer = setTimeout(()=>{
+
+    logoTapCount = 0;
+
+  }, 1200);
+
+  if(logoTapCount >= 5){
+
+    logoTapCount = 0;
+
+    clearTimeout(logoTapTimer);
+
+    openAdminLogin();
+
+  }
+
+}
+
+function openAdminLogin(){
+
+  document.getElementById("adminPasswordInput").value = "";
+
+  document.getElementById("adminLoginError").style.display = "none";
+
+  document
+    .getElementById("adminLoginOverlay")
+    .classList
+    .add("open");
+
+  document.body.style.overflow = "hidden";
+
+}
+
+function closeAdminLogin(){
+
+  document
+    .getElementById("adminLoginOverlay")
+    .classList
+    .remove("open");
+
+  document.body.style.overflow = "";
+
+}
+
+function closeAdminLoginFromOverlay(event){
+
+  if(event.target.id === "adminLoginOverlay"){
+
+    closeAdminLogin();
+
+  }
+
+}
+
+async function submitAdminLogin(){
+
+  const password =
+    document
+      .getElementById("adminPasswordInput")
+      .value;
+
+  const errorBox =
+    document.getElementById("adminLoginError");
+
+  errorBox.style.display = "none";
+
+  try{
+
+    const response = await fetch("/api/menu-state", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ password, action:"verify" })
+    });
+
+    if(!response.ok){
+
+      errorBox.textContent = "Falsches Passwort.";
+
+      errorBox.style.display = "block";
+
+      return;
+
+    }
+
+    adminPassword = password;
+
+    closeAdminLogin();
+
+    const stateResponse = await fetch("/api/menu-state");
+
+    const state = await stateResponse.json();
+
+    openAdminPanel(state);
+
+  }catch(error){
+
+    errorBox.textContent =
+      "Verbindung fehlgeschlagen. Bitte später erneut versuchen.";
+
+    errorBox.style.display = "block";
+
+  }
+
+}
+
+function openAdminPanel(state){
+
+  renderAdminPanel(state);
+
+  document
+    .getElementById("adminPanelOverlay")
+    .classList
+    .add("open");
+
+  document.body.style.overflow = "hidden";
+
+}
+
+function closeAdminPanel(){
+
+  document
+    .getElementById("adminPanelOverlay")
+    .classList
+    .remove("open");
+
+  document.body.style.overflow = "";
+
+}
+
+function closeAdminPanelFromOverlay(event){
+
+  if(event.target.id === "adminPanelOverlay"){
+
+    closeAdminPanel();
+
+  }
+
+}
+
+function renderAdminPanel(state){
+
+  const panel =
+    document.getElementById("adminPanel");
+
+  const allItems = [];
+
+  menu.forEach(section=>{
+
+    section.items.forEach(product=>{
+
+      if(product.price > 0){
+
+        allItems.push({
+          key: createProductKey(section.category, product.name),
+          label: section.category + " – " + product.name
+        });
+
+      }
+
+    });
+
+  });
+
+  panel.innerHTML = `
+
+    <button
+      class="modal-close"
+      onclick="closeAdminPanel()"
+    >
+      ✕
+    </button>
+
+    <h2>Admin-Bereich</h2>
+
+    <div style="margin-top:18px;">
+
+      <label style="display:block;margin-bottom:8px;font-weight:700;">
+        Zubereitungszeit
+      </label>
+
+      <input
+        id="adminPrepTimeInput"
+        type="text"
+        value="${state.prepTime}"
+        style="width:100%;padding:13px;border-radius:10px;border:1px solid var(--border);background:#1c1c1c;color:white;"
+      >
+
+    </div>
+
+    <div style="margin-top:24px;">
+
+      <label style="display:block;margin-bottom:8px;font-weight:700;">
+        Artikel ausverkauft
+      </label>
+
+      <div
+        id="adminItemList"
+        style="max-height:340px;overflow-y:auto;"
+      ></div>
+
+    </div>
+
+    <button
+      class="modal-add"
+      onclick="saveAdminChanges()"
+    >
+      Speichern
+    </button>
+
+  `;
+
+  const list =
+    document.getElementById("adminItemList");
+
+  list.innerHTML = allItems.map(item=>`
+
+    <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+
+      <span>${item.label}</span>
+
+      <input
+        type="checkbox"
+        data-key='${item.key}'
+        ${state.soldOut.includes(item.key) ? "checked" : ""}
+        style="width:22px;height:22px;flex:none;"
+      >
+
+    </label>
+
+  `).join("");
+
+}
+
+async function saveAdminChanges(){
+
+  const prepTime =
+    document
+      .getElementById("adminPrepTimeInput")
+      .value
+      .trim();
+
+  const checkboxes =
+    document.querySelectorAll(
+      "#adminItemList input[type=checkbox]"
+    );
+
+  const soldOut =
+    Array.from(checkboxes)
+      .filter(checkbox=> checkbox.checked)
+      .map(checkbox=> checkbox.dataset.key);
+
+  try{
+
+    const response = await fetch("/api/menu-state", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ password: adminPassword, prepTime, soldOut })
+    });
+
+    if(!response.ok){
+
+      alert("Speichern fehlgeschlagen. Bitte Admin-Bereich erneut öffnen.");
+
+      return;
+
+    }
+
+    closeAdminPanel();
+
+    applyMenuState({ prepTime, soldOut });
+
+  }catch(error){
+
+    alert("Verbindung fehlgeschlagen. Bitte später erneut versuchen.");
+
+  }
+
+}
+
+function applyMenuState(state){
+
+  const prepTimeElement =
+    document.querySelector(".preparation-time strong");
+
+  if(prepTimeElement && state.prepTime){
+
+    prepTimeElement.textContent = state.prepTime;
+
+  }
+
+  menu.forEach(section=>{
+
+    section.items.forEach(product=>{
+
+      if(product.price > 0){
+
+        const key =
+          createProductKey(section.category, product.name);
+
+        product.available =
+          !state.soldOut.includes(key);
+
+      }
+
+    });
+
+  });
+
+  renderMenu(
+    document.getElementById("searchInput").value
+  );
+
+}
+
+async function loadMenuState(){
+
+  try{
+
+    const response = await fetch("/api/menu-state");
+
+    if(!response.ok){
+
+      return;
+
+    }
+
+    const state = await response.json();
+
+    applyMenuState(state);
+
+  }catch(error){
+
+    // Kein Zugriff auf den Admin-Speicher – Standardwerte bleiben aktiv.
+
+  }
+
+}
+
+/*
+====================================================
+START
+====================================================
+*/
+
 renderCategoryNavigation();
 
 renderMenu();
@@ -2724,6 +3167,8 @@ renderMenu();
 updateCartIndicators();
 
 adjustStickyOffsets();
+
+loadMenuState();
 
 </script>
 
