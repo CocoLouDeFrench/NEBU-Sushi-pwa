@@ -2677,6 +2677,9 @@ function renderCart(){
 
     }).join("");
 
+  const orderingAllowed =
+    canOrderNow();
+
   cartContent.innerHTML = `
 
     ${itemsHtml}
@@ -2690,6 +2693,18 @@ function renderCart(){
       </span>
 
     </div>
+
+    ${
+      orderingAllowed
+        ? ""
+        : `
+          <div style="background:#2a1414;border:1px solid var(--danger);color:#ffb3b3;border-radius:12px;padding:14px;margin-bottom:16px;font-size:14px;line-height:1.5;">
+            Wir nehmen aktuell keine Bestellungen an.<br>
+            Öffnungszeiten: täglich 16:00–21:00 Uhr
+            (letzte Bestellung 20:50 Uhr).
+          </div>
+        `
+    }
 
     <div class="order-form">
 
@@ -2764,6 +2779,7 @@ function renderCart(){
       <button
         class="whatsapp-button"
         onclick="sendWhatsAppOrder()"
+        ${orderingAllowed ? "" : "disabled style=\"opacity:.45;\""}
       >
 
         Bestellung per WhatsApp senden
@@ -2831,20 +2847,33 @@ function buildPickupNowOptions(){
     baseMinutes + 45
   ];
 
-  return offsets.map((minutes,index)=>{
+  const options = [];
+
+  offsets.forEach((minutes,index)=>{
+
+    const targetDate =
+      new Date(Date.now() + minutes * 60000);
+
+    if(!isWithinOrderWindow(targetDate)){
+
+      return;
+
+    }
 
     const timeLabel =
       formatClockTimeFromNow(minutes);
 
-    return {
+    options.push({
       minutes,
       label:
         index === 0
           ? "Schnellstmöglich (ca. " + timeLabel + " Uhr)"
           : "ca. " + timeLabel + " Uhr"
-    };
+    });
 
   });
+
+  return options;
 
 }
 
@@ -2968,11 +2997,12 @@ function isPlausiblePhoneNumber(value){
 
 function sendWhatsAppOrder(){
 
-  if(!shopIsOpen){
+  if(!canOrderNow()){
 
     alert(
-      "Wir haben aktuell leider geschlossen. " +
-      "Bitte versuche es während unserer Öffnungszeiten erneut."
+      "Wir nehmen aktuell keine Bestellungen an. " +
+      "Öffnungszeiten: täglich 16:00–21:00 Uhr " +
+      "(letzte Bestellung 20:50 Uhr)."
     );
 
     return;
@@ -3046,6 +3076,20 @@ function sendWhatsAppOrder(){
 
       alert(
         "Bitte Datum und Uhrzeit für die Vorbestellung auswählen."
+      );
+
+      return;
+
+    }
+
+    const pickupLaterDate =
+      new Date(pickupLaterValue);
+
+    if(!isWithinOrderWindow(pickupLaterDate)){
+
+      alert(
+        "Vorbestellungen sind nur zwischen 16:00 und 20:50 Uhr möglich. " +
+        "Bitte eine andere Uhrzeit wählen."
       );
 
       return;
@@ -3417,7 +3461,20 @@ function renderAdminPanel(state){
 
   }
 
-  const isOpen = state.isOpen !== false;
+  const statusMode =
+    state.statusMode ||
+    (state.isOpen === false ? "closed" : "auto");
+
+  const statusButtonStyle = (mode,color)=>{
+
+    const active = statusMode === mode;
+
+    return "flex:1;padding:12px 6px;border-radius:10px;border:2px solid " +
+      color + ";background:" + (active ? color : "transparent") +
+      ";color:" + (active ? (color === "var(--whatsapp)" ? "black" : "white") : color) +
+      ";font-weight:800;font-size:13px;";
+
+  };
 
   panel.innerHTML = `
 
@@ -3436,29 +3493,43 @@ function renderAdminPanel(state){
         Geschäftsstatus
       </label>
 
-      <div style="display:flex;gap:10px;">
+      <p style="color:var(--muted);font-size:13px;margin:0 0 10px;">
+        Öffnungszeiten: täglich 16:00–21:00 Uhr,
+        letzte Bestellung 20:50 Uhr.
+      </p>
+
+      <div style="display:flex;gap:8px;">
 
         <button
           type="button"
-          id="adminOpenButton"
-          onclick="setAdminOpenStatus(true)"
-          style="flex:1;padding:13px;border-radius:10px;border:2px solid var(--whatsapp);background:${isOpen ? "var(--whatsapp)" : "transparent"};color:${isOpen ? "black" : "var(--whatsapp)"};font-weight:800;"
+          id="adminStatusAutoButton"
+          onclick="setAdminStatusMode('auto')"
+          style="${statusButtonStyle('auto','#f6c700')}"
+        >
+          Automatisch
+        </button>
+
+        <button
+          type="button"
+          id="adminStatusOpenButton"
+          onclick="setAdminStatusMode('open')"
+          style="${statusButtonStyle('open','var(--whatsapp)')}"
         >
           Geöffnet
         </button>
 
         <button
           type="button"
-          id="adminClosedButton"
-          onclick="setAdminOpenStatus(false)"
-          style="flex:1;padding:13px;border-radius:10px;border:2px solid var(--danger);background:${!isOpen ? "var(--danger)" : "transparent"};color:${!isOpen ? "white" : "var(--danger)"};font-weight:800;"
+          id="adminStatusClosedButton"
+          onclick="setAdminStatusMode('closed')"
+          style="${statusButtonStyle('closed','var(--danger)')}"
         >
           Geschlossen
         </button>
 
       </div>
 
-      <input type="hidden" id="adminIsOpenValue" value="${isOpen}">
+      <input type="hidden" id="adminStatusModeValue" value="${statusMode}">
 
     </div>
 
@@ -3532,21 +3603,86 @@ function renderAdminPanel(state){
 
 }
 
-function setAdminOpenStatus(isOpen){
+function setAdminStatusMode(mode){
 
-  document.getElementById("adminIsOpenValue").value = isOpen;
+  document.getElementById("adminStatusModeValue").value = mode;
 
-  document.getElementById("adminOpenButton").style.background =
-    isOpen ? "var(--whatsapp)" : "transparent";
+  const buttons = {
+    auto: { id:"adminStatusAutoButton", color:"#f6c700", textColor:"black" },
+    open: { id:"adminStatusOpenButton", color:"var(--whatsapp)", textColor:"black" },
+    closed: { id:"adminStatusClosedButton", color:"var(--danger)", textColor:"white" }
+  };
 
-  document.getElementById("adminOpenButton").style.color =
-    isOpen ? "black" : "var(--whatsapp)";
+  Object.keys(buttons).forEach(key=>{
 
-  document.getElementById("adminClosedButton").style.background =
-    !isOpen ? "var(--danger)" : "transparent";
+    const config = buttons[key];
 
-  document.getElementById("adminClosedButton").style.color =
-    !isOpen ? "white" : "var(--danger)";
+    const button = document.getElementById(config.id);
+
+    const active = key === mode;
+
+    button.style.background = active ? config.color : "transparent";
+
+    button.style.color = active ? config.textColor : config.color;
+
+  });
+
+}
+
+const OPENING_HOURS = {
+  openHour: 16,
+  openMinute: 0,
+  closeHour: 21,
+  closeMinute: 0,
+  lastOrderHour: 20,
+  lastOrderMinute: 50
+};
+
+function minutesSinceMidnight(date){
+
+  return date.getHours() * 60 + date.getMinutes();
+
+}
+
+function isWithinOpeningHours(date = new Date()){
+
+  const minutes = minutesSinceMidnight(date);
+
+  const openMinutes =
+    OPENING_HOURS.openHour * 60 + OPENING_HOURS.openMinute;
+
+  const closeMinutes =
+    OPENING_HOURS.closeHour * 60 + OPENING_HOURS.closeMinute;
+
+  return minutes >= openMinutes && minutes < closeMinutes;
+
+}
+
+function isWithinOrderWindow(date = new Date()){
+
+  const minutes = minutesSinceMidnight(date);
+
+  const openMinutes =
+    OPENING_HOURS.openHour * 60 + OPENING_HOURS.openMinute;
+
+  const lastOrderMinutes =
+    OPENING_HOURS.lastOrderHour * 60 + OPENING_HOURS.lastOrderMinute;
+
+  return minutes >= openMinutes && minutes < lastOrderMinutes;
+
+}
+
+let currentStatusMode = "auto";
+
+function canOrderNow(){
+
+  if(currentStatusMode === "closed"){
+
+    return false;
+
+  }
+
+  return isWithinOrderWindow();
 
 }
 
@@ -3557,10 +3693,10 @@ async function saveAdminChanges(){
       .getElementById("adminPrepTimeInput")
       .value;
 
-  const isOpen =
+  const statusMode =
     document
-      .getElementById("adminIsOpenValue")
-      .value === "true";
+      .getElementById("adminStatusModeValue")
+      .value;
 
   const checkboxes =
     document.querySelectorAll(
@@ -3577,7 +3713,7 @@ async function saveAdminChanges(){
     const response = await fetch("/api/menu-state", {
       method:"POST",
       headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ password: adminPassword, prepTime, isOpen, soldOut })
+      body: JSON.stringify({ password: adminPassword, prepTime, statusMode, soldOut })
     });
 
     if(!response.ok){
@@ -3590,7 +3726,7 @@ async function saveAdminChanges(){
 
     closeAdminPanel();
 
-    applyMenuState({ prepTime, isOpen, soldOut });
+    applyMenuState({ prepTime, statusMode, soldOut });
 
   }catch(error){
 
@@ -3601,6 +3737,32 @@ async function saveAdminChanges(){
 }
 
 let shopIsOpen = true;
+
+function refreshShopStatusDisplay(){
+
+  const statusDot =
+    document.getElementById("statusDot");
+
+  const statusText =
+    document.getElementById("statusText");
+
+  shopIsOpen =
+    currentStatusMode === "open"
+      ? true
+      : currentStatusMode === "closed"
+        ? false
+        : isWithinOpeningHours();
+
+  if(statusDot && statusText){
+
+    statusDot.classList.toggle("closed", !shopIsOpen);
+
+    statusText.textContent =
+      shopIsOpen ? "Geöffnet" : "Geschlossen";
+
+  }
+
+}
 
 function applyMenuState(state){
 
@@ -3613,22 +3775,11 @@ function applyMenuState(state){
 
   }
 
-  shopIsOpen = state.isOpen !== false;
+  currentStatusMode =
+    state.statusMode ||
+    (state.isOpen === false ? "closed" : "auto");
 
-  const statusDot =
-    document.getElementById("statusDot");
-
-  const statusText =
-    document.getElementById("statusText");
-
-  if(statusDot && statusText){
-
-    statusDot.classList.toggle("closed", !shopIsOpen);
-
-    statusText.textContent =
-      shopIsOpen ? "Geöffnet" : "Geschlossen";
-
-  }
+  refreshShopStatusDisplay();
 
   menu.forEach(section=>{
 
@@ -3693,6 +3844,8 @@ updateCartIndicators();
 adjustStickyOffsets();
 
 loadMenuState();
+
+setInterval(refreshShopStatusDisplay, 60000);
 
 </script>
 
