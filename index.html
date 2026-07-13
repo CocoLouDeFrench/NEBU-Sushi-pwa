@@ -352,47 +352,39 @@ button{
 }
 
 .product-price{
-  margin:8px 0 18px;
+  margin:8px 0 4px;
   font-size:21px;
 }
 
-.product-actions{
-  display:flex;
-  justify-content:center;
-  gap:16px;
-  align-items:center;
-}
-
-.favorite-button,
-.info-button{
-  border:none;
-  background:none;
-  color:white;
-  padding:0;
-}
-
-.favorite-button{
-  font-size:31px;
-}
-
-.info-button{
-  font-size:16px;
-  font-weight:800;
+.info-badge{
+  position:absolute;
+  left:6%;
+  top:6%;
+  z-index:5;
   display:flex;
   align-items:center;
   gap:6px;
+  border:none;
+  background:white;
+  color:#111111;
+  border-radius:20px;
+  padding:6px 14px 6px 6px;
+  font-size:13px;
+  font-weight:700;
+  box-shadow:0 4px 12px rgba(0,0,0,.35);
 }
 
-.info-symbol{
-  width:30px;
-  height:30px;
-  border:2px solid white;
+.info-badge-icon{
+  width:20px;
+  height:20px;
+  flex:none;
+  border:2px solid #111111;
   border-radius:50%;
   display:inline-flex;
   align-items:center;
   justify-content:center;
   font-family:serif;
-  font-size:20px;
+  font-size:13px;
 }
 
 .unavailable{
@@ -752,13 +744,15 @@ button{
     font-size:32px;
   }
 
-  .info-button{
-    font-size:14px;
+  .info-badge{
+    font-size:11px;
+    padding:5px 10px 5px 5px;
   }
 
-  .info-symbol{
-    width:27px;
-    height:27px;
+  .info-badge-icon{
+    width:16px;
+    height:16px;
+    font-size:11px;
   }
 
 }
@@ -1845,6 +1839,23 @@ function renderMenu(searchTerm=""){
             onerror="tryNextImage(this)"
           >
 
+          <button
+            class="info-badge"
+            type="button"
+            onclick='openProductModal(
+              ${JSON.stringify(section.category)},
+              ${JSON.stringify(product.name)}
+            )'
+          >
+
+            <span class="info-badge-icon">
+              i
+            </span>
+
+            Info
+
+          </button>
+
           ${
             product.available
               ? `
@@ -1882,35 +1893,6 @@ function renderMenu(searchTerm=""){
               </div>
             `
         }
-
-        <div class="product-actions">
-
-          <button
-            class="favorite-button"
-            type="button"
-            aria-label="Favorit"
-          >
-            ♡
-          </button>
-
-          <button
-            class="info-button"
-            type="button"
-            onclick='openProductModal(
-              ${JSON.stringify(section.category)},
-              ${JSON.stringify(product.name)}
-            )'
-          >
-
-            <span class="info-symbol">
-              i
-            </span>
-
-            Produktinfo
-
-          </button>
-
-        </div>
 
       `;
 
