@@ -2677,8 +2677,44 @@ function renderCart(){
 
     }).join("");
 
-  const orderingAllowed =
-    canOrderNow();
+  const manuallyClosed =
+    currentStatusMode === "closed";
+
+  const orderWindowOpenNow =
+    isWithinOrderWindow();
+
+  const defaultPickupMode =
+    orderWindowOpenNow ? "now" : "later";
+
+  let statusBanner = "";
+
+  if(manuallyClosed){
+
+    statusBanner = `
+
+      <div style="background:#2a1414;border:1px solid var(--danger);color:#ffb3b3;border-radius:12px;padding:14px;margin-bottom:16px;font-size:14px;line-height:1.5;">
+        Wir nehmen aktuell keine Bestellungen an.<br>
+        Öffnungszeiten: täglich 16:00–21:00 Uhr
+        (letzte Bestellung 20:50 Uhr).
+      </div>
+
+    `;
+
+  }else if(!orderWindowOpenNow){
+
+    statusBanner = `
+
+      <div style="background:#1f1c0c;border:1px solid var(--gold-soft);color:var(--gold);border-radius:12px;padding:14px;margin-bottom:16px;font-size:14px;line-height:1.5;">
+        Aktuell ist keine Sofort-Bestellung möglich
+        (Öffnungszeiten täglich 16:00–21:00 Uhr,
+        letzte Bestellung 20:50 Uhr).<br>
+        Du kannst aber gerne für die nächste
+        Öffnungszeit vorbestellen!
+      </div>
+
+    `;
+
+  }
 
   cartContent.innerHTML = `
 
@@ -2694,17 +2730,7 @@ function renderCart(){
 
     </div>
 
-    ${
-      orderingAllowed
-        ? ""
-        : `
-          <div style="background:#2a1414;border:1px solid var(--danger);color:#ffb3b3;border-radius:12px;padding:14px;margin-bottom:16px;font-size:14px;line-height:1.5;">
-            Wir nehmen aktuell keine Bestellungen an.<br>
-            Öffnungszeiten: täglich 16:00–21:00 Uhr
-            (letzte Bestellung 20:50 Uhr).
-          </div>
-        `
-    }
+    ${statusBanner}
 
     <div class="order-form">
 
@@ -2725,8 +2751,9 @@ function renderCart(){
         <button
           type="button"
           id="pickupModeNowButton"
-          class="pickup-mode-button active"
+          class="pickup-mode-button ${defaultPickupMode === "now" ? "active" : ""}"
           onclick="setPickupMode('now')"
+          ${orderWindowOpenNow ? "" : "disabled style=\"opacity:.4;\""}
         >
           Jetzt bestellen
         </button>
@@ -2734,7 +2761,7 @@ function renderCart(){
         <button
           type="button"
           id="pickupModeLaterButton"
-          class="pickup-mode-button"
+          class="pickup-mode-button ${defaultPickupMode === "later" ? "active" : ""}"
           onclick="setPickupMode('later')"
         >
           Vorbestellen
@@ -2745,10 +2772,13 @@ function renderCart(){
       <input
         type="hidden"
         id="pickupMode"
-        value="now"
+        value="${defaultPickupMode}"
       >
 
-      <select id="pickupTimeNow">
+      <select
+        id="pickupTimeNow"
+        style="${defaultPickupMode === "now" ? "" : "display:none;"}"
+      >
 
         <option value="">
           Abholzeit auswählen *
@@ -2768,7 +2798,8 @@ function renderCart(){
         id="pickupTimeLater"
         type="datetime-local"
         min="${minDateTimeLocalValue()}"
-        style="display:none;"
+        value="${minDateTimeLocalValue()}"
+        style="${defaultPickupMode === "later" ? "" : "display:none;"}"
       >
 
       <textarea
@@ -2779,7 +2810,7 @@ function renderCart(){
       <button
         class="whatsapp-button"
         onclick="sendWhatsAppOrder()"
-        ${orderingAllowed ? "" : "disabled style=\"opacity:.45;\""}
+        ${manuallyClosed ? "disabled style=\"opacity:.45;\"" : ""}
       >
 
         Bestellung per WhatsApp senden
@@ -2877,13 +2908,61 @@ function buildPickupNowOptions(){
 
 }
 
+function nextAvailableOrderSlot(){
+
+  const now = new Date();
+
+  const openMinutes =
+    OPENING_HOURS.openHour * 60 + OPENING_HOURS.openMinute;
+
+  const lastOrderMinutes =
+    OPENING_HOURS.lastOrderHour * 60 + OPENING_HOURS.lastOrderMinute;
+
+  const nowMinutes =
+    minutesSinceMidnight(now);
+
+  const candidate =
+    new Date(now);
+
+  if(nowMinutes < openMinutes){
+
+    candidate.setHours(
+      OPENING_HOURS.openHour,
+      OPENING_HOURS.openMinute,
+      0,
+      0
+    );
+
+  }else if(nowMinutes >= lastOrderMinutes){
+
+    candidate.setDate(candidate.getDate() + 1);
+
+    candidate.setHours(
+      OPENING_HOURS.openHour,
+      OPENING_HOURS.openMinute,
+      0,
+      0
+    );
+
+  }else{
+
+    const prepMinutes =
+      parsePrepMinutes();
+
+    candidate.setTime(
+      now.getTime() + prepMinutes * 60000
+    );
+
+  }
+
+  return candidate;
+
+}
+
 function minDateTimeLocalValue(){
 
-  const baseMinutes =
-    parsePrepMinutes();
-
   const date =
-    new Date(Date.now() + baseMinutes * 60000);
+    nextAvailableOrderSlot();
 
   const pad =
     number => String(number).padStart(2,"0");
@@ -2997,7 +3076,7 @@ function isPlausiblePhoneNumber(value){
 
 function sendWhatsAppOrder(){
 
-  if(!canOrderNow()){
+  if(currentStatusMode === "closed"){
 
     alert(
       "Wir nehmen aktuell keine Bestellungen an. " +
@@ -3100,6 +3179,17 @@ function sendWhatsAppOrder(){
       formatPickupLaterLabel(pickupLaterValue);
 
   }else{
+
+    if(!isWithinOrderWindow()){
+
+      alert(
+        "Sofort-Bestellung ist aktuell nicht möglich. " +
+        "Bitte nutze die Vorbestellung."
+      );
+
+      return;
+
+    }
 
     const pickupNowValue =
       document
