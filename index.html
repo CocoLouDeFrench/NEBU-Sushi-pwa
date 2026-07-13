@@ -631,6 +631,28 @@ button{
   resize:vertical;
 }
 
+.pickup-mode-toggle{
+  display:flex;
+  gap:10px;
+}
+
+.pickup-mode-button{
+  flex:1;
+  padding:12px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:#1c1c1c;
+  color:white;
+  font-weight:700;
+  font-size:14px;
+}
+
+.pickup-mode-button.active{
+  background:white;
+  color:black;
+  border-color:white;
+}
+
 .whatsapp-button{
   border:none;
   border-radius:12px;
@@ -1810,6 +1832,7 @@ function renderCategoryNavigation(){
 
         <button
           class="category-button ${index === 0 ? "active" : ""}"
+          data-section="${createSectionId(section.category)}"
           onclick="scrollToCategory(
             '${createSectionId(section.category)}',
             this
@@ -1847,6 +1870,91 @@ function scrollToCategory(sectionId,button){
     });
 
   button.classList.add("active");
+
+}
+
+let categoryScrollObserver = null;
+
+function setupCategoryScrollSpy(){
+
+  if(categoryScrollObserver){
+
+    categoryScrollObserver.disconnect();
+
+  }
+
+  const sections =
+    document.querySelectorAll(".menu-section");
+
+  if(sections.length === 0){
+
+    return;
+
+  }
+
+  const header =
+    document.querySelector(".shop-header");
+
+  const wrapper =
+    document.querySelector(".category-wrapper");
+
+  const topOffset =
+    (header ? header.offsetHeight : 0) +
+    (wrapper ? wrapper.offsetHeight : 0);
+
+  categoryScrollObserver = new IntersectionObserver(
+    entries=>{
+
+      entries.forEach(entry=>{
+
+        if(!entry.isIntersecting){
+
+          return;
+
+        }
+
+        const button =
+          document.querySelector(
+            '.category-button[data-section="' +
+            entry.target.id +
+            '"]'
+          );
+
+        if(!button){
+
+          return;
+
+        }
+
+        document
+          .querySelectorAll(".category-button")
+          .forEach(item=>{
+            item.classList.remove("active");
+          });
+
+        button.classList.add("active");
+
+        button.scrollIntoView({
+          behavior:"smooth",
+          inline:"center",
+          block:"nearest"
+        });
+
+      });
+
+    },
+    {
+      rootMargin:
+        "-" + (topOffset + 10) + "px 0px -70% 0px",
+      threshold: 0
+    }
+  );
+
+  sections.forEach(section=>{
+
+    categoryScrollObserver.observe(section);
+
+  });
 
 }
 
@@ -2034,6 +2142,8 @@ function renderMenu(searchTerm=""){
     `;
 
   }
+
+  setupCategoryScrollSpy();
 
 }
 
@@ -2595,33 +2705,56 @@ function renderCart(){
         placeholder="Telefonnummer *"
       >
 
-      <select id="pickupTime">
+      <div class="pickup-mode-toggle">
+
+        <button
+          type="button"
+          id="pickupModeNowButton"
+          class="pickup-mode-button active"
+          onclick="setPickupMode('now')"
+        >
+          Jetzt bestellen
+        </button>
+
+        <button
+          type="button"
+          id="pickupModeLaterButton"
+          class="pickup-mode-button"
+          onclick="setPickupMode('later')"
+        >
+          Vorbestellen
+        </button>
+
+      </div>
+
+      <input
+        type="hidden"
+        id="pickupMode"
+        value="now"
+      >
+
+      <select id="pickupTimeNow">
 
         <option value="">
           Abholzeit auswählen *
         </option>
 
-        <option value="Schnellstmöglich">
-          Schnellstmöglich
-        </option>
-
-        <option value="In 30 Minuten">
-          In 30 Minuten
-        </option>
-
-        <option value="In 40 Minuten">
-          In 40 Minuten
-        </option>
-
-        <option value="In 50 Minuten">
-          In 50 Minuten
-        </option>
-
-        <option value="In 60 Minuten">
-          In 60 Minuten
-        </option>
+        ${
+          buildPickupNowOptions()
+            .map(option=>
+              `<option value="${option.label}">${option.label}</option>`
+            )
+            .join("")
+        }
 
       </select>
+
+      <input
+        id="pickupTimeLater"
+        type="datetime-local"
+        min="${minDateTimeLocalValue()}"
+        style="display:none;"
+      >
 
       <textarea
         id="orderNote"
@@ -2657,6 +2790,182 @@ WHATSAPP-BESTELLUNG
 ====================================================
 */
 
+function parsePrepMinutes(){
+
+  const element =
+    document.querySelector(".preparation-time strong");
+
+  const text =
+    element ? element.textContent : "30";
+
+  const match =
+    text.match(/\d+/);
+
+  return match
+    ? parseInt(match[0],10)
+    : 30;
+
+}
+
+function formatClockTimeFromNow(addMinutes){
+
+  const date =
+    new Date(Date.now() + addMinutes * 60000);
+
+  return date.toLocaleTimeString(
+    "de-DE",
+    { hour:"2-digit", minute:"2-digit" }
+  );
+
+}
+
+function buildPickupNowOptions(){
+
+  const baseMinutes =
+    parsePrepMinutes();
+
+  const offsets = [
+    baseMinutes,
+    baseMinutes + 15,
+    baseMinutes + 30,
+    baseMinutes + 45
+  ];
+
+  return offsets.map((minutes,index)=>{
+
+    const timeLabel =
+      formatClockTimeFromNow(minutes);
+
+    return {
+      minutes,
+      label:
+        index === 0
+          ? "Schnellstmöglich (ca. " + timeLabel + " Uhr)"
+          : "ca. " + timeLabel + " Uhr"
+    };
+
+  });
+
+}
+
+function minDateTimeLocalValue(){
+
+  const baseMinutes =
+    parsePrepMinutes();
+
+  const date =
+    new Date(Date.now() + baseMinutes * 60000);
+
+  const pad =
+    number => String(number).padStart(2,"0");
+
+  return (
+    date.getFullYear() +
+    "-" +
+    pad(date.getMonth() + 1) +
+    "-" +
+    pad(date.getDate()) +
+    "T" +
+    pad(date.getHours()) +
+    ":" +
+    pad(date.getMinutes())
+  );
+
+}
+
+function formatPickupLaterLabel(value){
+
+  const date =
+    new Date(value);
+
+  const dateLabel =
+    date.toLocaleDateString(
+      "de-DE",
+      { weekday:"long", day:"2-digit", month:"2-digit", year:"numeric" }
+    );
+
+  const timeLabel =
+    date.toLocaleTimeString(
+      "de-DE",
+      { hour:"2-digit", minute:"2-digit" }
+    );
+
+  return "Vorbestellung – " + dateLabel + " um " + timeLabel + " Uhr";
+
+}
+
+function setPickupMode(mode){
+
+  document
+    .getElementById("pickupModeNowButton")
+    .classList.toggle("active", mode === "now");
+
+  document
+    .getElementById("pickupModeLaterButton")
+    .classList.toggle("active", mode === "later");
+
+  document
+    .getElementById("pickupTimeNow")
+    .style.display = mode === "now" ? "block" : "none";
+
+  document
+    .getElementById("pickupTimeLater")
+    .style.display = mode === "later" ? "block" : "none";
+
+  document.getElementById("pickupMode").value = mode;
+
+}
+
+function isPlausiblePhoneNumber(value){
+
+  const digitsOnly =
+    value.replace(/[^\d]/g,"");
+
+  if(digitsOnly.length < 7 || digitsOnly.length > 15){
+
+    return false;
+
+  }
+
+  if(/^(\d)\1+$/.test(digitsOnly)){
+
+    return false;
+
+  }
+
+  const ascending = "0123456789";
+
+  const descending = "9876543210";
+
+  if(
+    ascending.includes(digitsOnly) ||
+    descending.includes(digitsOnly)
+  ){
+
+    return false;
+
+  }
+
+  const knownFakeNumbers = [
+    "1234567",
+    "12345678",
+    "123456789",
+    "1234567890",
+    "0000000",
+    "1111111",
+    "0123456"
+  ];
+
+  if(knownFakeNumbers.includes(digitsOnly)){
+
+    return false;
+
+  }
+
+  return true;
+
+}
+
 function sendWhatsAppOrder(){
 
   if(!shopIsOpen){
@@ -2682,9 +2991,9 @@ function sendWhatsAppOrder(){
       .value
       .trim();
 
-  const pickupTime =
+  const pickupMode =
     document
-      .getElementById("pickupTime")
+      .getElementById("pickupMode")
       .value;
 
   const note =
@@ -2713,13 +3022,58 @@ function sendWhatsAppOrder(){
 
   }
 
-  if(!pickupTime){
+  if(!isPlausiblePhoneNumber(phone)){
 
     alert(
-      "Bitte eine Abholzeit auswählen."
+      "Bitte eine gültige Telefonnummer eintragen " +
+      "(mind. 7 Ziffern, keine Fantasienummer wie 123456)."
     );
 
     return;
+
+  }
+
+  let pickupLabel = "";
+
+  if(pickupMode === "later"){
+
+    const pickupLaterValue =
+      document
+        .getElementById("pickupTimeLater")
+        .value;
+
+    if(!pickupLaterValue){
+
+      alert(
+        "Bitte Datum und Uhrzeit für die Vorbestellung auswählen."
+      );
+
+      return;
+
+    }
+
+    pickupLabel =
+      formatPickupLaterLabel(pickupLaterValue);
+
+  }else{
+
+    const pickupNowValue =
+      document
+        .getElementById("pickupTimeNow")
+        .value;
+
+    if(!pickupNowValue){
+
+      alert(
+        "Bitte eine Abholzeit auswählen."
+      );
+
+      return;
+
+    }
+
+    pickupLabel =
+      pickupNowValue;
 
   }
 
@@ -2769,7 +3123,7 @@ function sendWhatsAppOrder(){
       phone,
 
     "Gewünschte Abholzeit: " +
-      pickupTime,
+      pickupLabel,
 
     note
       ? "Anmerkung: " + note
@@ -2782,6 +3136,22 @@ function sendWhatsAppOrder(){
   ]
   .filter(Boolean)
   .join("\n");
+
+  const confirmed =
+    window.confirm(
+      "Bitte kurz prüfen:\n\n" +
+      "Name: " + name + "\n" +
+      "Telefonnummer: " + phone + "\n" +
+      "Abholzeit: " + pickupLabel + "\n" +
+      "Gesamt: " + euro(getCartTotal()) + "\n\n" +
+      "Bestellung jetzt per WhatsApp senden?"
+    );
+
+  if(!confirmed){
+
+    return;
+
+  }
 
   const whatsappNumber =
     "4915730642210";
