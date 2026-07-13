@@ -140,6 +140,30 @@ button{
   font-size:17px;
 }
 
+.shop-status{
+  max-width:1200px;
+  margin:auto;
+  padding:10px 18px 0;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  font-size:15px;
+  font-weight:700;
+  color:#eeeeee;
+}
+
+.status-dot{
+  width:11px;
+  height:11px;
+  border-radius:50%;
+  background:var(--whatsapp);
+  flex:none;
+}
+
+.status-dot.closed{
+  background:var(--danger);
+}
+
 .preparation-icon{
   width:34px;
   height:34px;
@@ -826,6 +850,19 @@ button{
       type="search"
       placeholder="Nach einem Artikel suchen"
     >
+
+  </div>
+
+  <div class="shop-status" id="shopStatusRow">
+
+    <span
+      class="status-dot"
+      id="statusDot"
+    ></span>
+
+    <span id="statusText">
+      Geöffnet
+    </span>
 
   </div>
 
@@ -2622,6 +2659,17 @@ WHATSAPP-BESTELLUNG
 
 function sendWhatsAppOrder(){
 
+  if(!shopIsOpen){
+
+    alert(
+      "Wir haben aktuell leider geschlossen. " +
+      "Bitte versuche es während unserer Öffnungszeiten erneut."
+    );
+
+    return;
+
+  }
+
   const name =
     document
       .getElementById("customerName")
@@ -2979,6 +3027,28 @@ function renderAdminPanel(state){
 
   });
 
+  const prepTimeOptions = [
+    "ca. 15 Minuten",
+    "ca. 20 Minuten",
+    "ca. 25 Minuten",
+    "ca. 30 Minuten",
+    "ca. 35 Minuten",
+    "ca. 40 Minuten",
+    "ca. 45 Minuten",
+    "ca. 50 Minuten",
+    "ca. 60 Minuten",
+    "ca. 75 Minuten",
+    "ca. 90 Minuten"
+  ];
+
+  if(!prepTimeOptions.includes(state.prepTime)){
+
+    prepTimeOptions.unshift(state.prepTime);
+
+  }
+
+  const isOpen = state.isOpen !== false;
+
   panel.innerHTML = `
 
     <button
@@ -2993,15 +3063,58 @@ function renderAdminPanel(state){
     <div style="margin-top:18px;">
 
       <label style="display:block;margin-bottom:8px;font-weight:700;">
+        Geschäftsstatus
+      </label>
+
+      <div style="display:flex;gap:10px;">
+
+        <button
+          type="button"
+          id="adminOpenButton"
+          onclick="setAdminOpenStatus(true)"
+          style="flex:1;padding:13px;border-radius:10px;border:2px solid var(--whatsapp);background:${isOpen ? "var(--whatsapp)" : "transparent"};color:${isOpen ? "black" : "var(--whatsapp)"};font-weight:800;"
+        >
+          Geöffnet
+        </button>
+
+        <button
+          type="button"
+          id="adminClosedButton"
+          onclick="setAdminOpenStatus(false)"
+          style="flex:1;padding:13px;border-radius:10px;border:2px solid var(--danger);background:${!isOpen ? "var(--danger)" : "transparent"};color:${!isOpen ? "white" : "var(--danger)"};font-weight:800;"
+        >
+          Geschlossen
+        </button>
+
+      </div>
+
+      <input type="hidden" id="adminIsOpenValue" value="${isOpen}">
+
+    </div>
+
+    <div style="margin-top:24px;">
+
+      <label style="display:block;margin-bottom:8px;font-weight:700;">
         Zubereitungszeit
       </label>
 
-      <input
+      <select
         id="adminPrepTimeInput"
-        type="text"
-        value="${state.prepTime}"
         style="width:100%;padding:13px;border-radius:10px;border:1px solid var(--border);background:#1c1c1c;color:white;"
       >
+
+        ${
+          prepTimeOptions.map(option=>`
+            <option
+              value="${option}"
+              ${option === state.prepTime ? "selected" : ""}
+            >
+              ${option}
+            </option>
+          `).join("")
+        }
+
+      </select>
 
     </div>
 
@@ -3049,13 +3162,35 @@ function renderAdminPanel(state){
 
 }
 
+function setAdminOpenStatus(isOpen){
+
+  document.getElementById("adminIsOpenValue").value = isOpen;
+
+  document.getElementById("adminOpenButton").style.background =
+    isOpen ? "var(--whatsapp)" : "transparent";
+
+  document.getElementById("adminOpenButton").style.color =
+    isOpen ? "black" : "var(--whatsapp)";
+
+  document.getElementById("adminClosedButton").style.background =
+    !isOpen ? "var(--danger)" : "transparent";
+
+  document.getElementById("adminClosedButton").style.color =
+    !isOpen ? "white" : "var(--danger)";
+
+}
+
 async function saveAdminChanges(){
 
   const prepTime =
     document
       .getElementById("adminPrepTimeInput")
-      .value
-      .trim();
+      .value;
+
+  const isOpen =
+    document
+      .getElementById("adminIsOpenValue")
+      .value === "true";
 
   const checkboxes =
     document.querySelectorAll(
@@ -3072,7 +3207,7 @@ async function saveAdminChanges(){
     const response = await fetch("/api/menu-state", {
       method:"POST",
       headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ password: adminPassword, prepTime, soldOut })
+      body: JSON.stringify({ password: adminPassword, prepTime, isOpen, soldOut })
     });
 
     if(!response.ok){
@@ -3085,7 +3220,7 @@ async function saveAdminChanges(){
 
     closeAdminPanel();
 
-    applyMenuState({ prepTime, soldOut });
+    applyMenuState({ prepTime, isOpen, soldOut });
 
   }catch(error){
 
@@ -3095,6 +3230,8 @@ async function saveAdminChanges(){
 
 }
 
+let shopIsOpen = true;
+
 function applyMenuState(state){
 
   const prepTimeElement =
@@ -3103,6 +3240,23 @@ function applyMenuState(state){
   if(prepTimeElement && state.prepTime){
 
     prepTimeElement.textContent = state.prepTime;
+
+  }
+
+  shopIsOpen = state.isOpen !== false;
+
+  const statusDot =
+    document.getElementById("statusDot");
+
+  const statusText =
+    document.getElementById("statusText");
+
+  if(statusDot && statusText){
+
+    statusDot.classList.toggle("closed", !shopIsOpen);
+
+    statusText.textContent =
+      shopIsOpen ? "Geöffnet" : "Geschlossen";
 
   }
 
