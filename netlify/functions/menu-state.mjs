@@ -2,6 +2,7 @@ import { getStore } from "@netlify/blobs";
 
 const DEFAULT_STATE = {
   prepTime: "ca. 35 Minuten",
+  isOpen: true,
   soldOut: []
 };
 
@@ -45,6 +46,7 @@ export default async (req) => {
       prepTime: typeof body.prepTime === "string" && body.prepTime.trim()
         ? body.prepTime.trim()
         : DEFAULT_STATE.prepTime,
+      isOpen: typeof body.isOpen === "boolean" ? body.isOpen : DEFAULT_STATE.isOpen,
       soldOut: Array.isArray(body.soldOut) ? body.soldOut : []
     };
 
