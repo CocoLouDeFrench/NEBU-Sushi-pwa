@@ -22,7 +22,7 @@ export default async req=>{
  const o=orders.find(o=>o.id===body.id);if(!o)return json({error:'Bestellung nicht gefunden'},404);
  const next=body.status;const transitions={new:['accepted','rejected'],accepted:['preparing'],preparing:['ready'],ready:['enroute'],enroute:['delivered'],delivered:[],rejected:[]};
  if(next&&!(transitions[o.status]||[]).includes(next))return json({error:'Ungültiger Statuswechsel'},409);
- if(next){o.status=next;if(next==='accepted'){const eta=Number(body.eta);if(![30,45,60,75].includes(eta))return json({error:'Ungültige Lieferzeit'},400);o.eta=eta}}
+ if(next){if(next==='accepted'){const eta=Number(body.eta);if(![30,45,60,75].includes(eta))return json({error:'Ungültige Lieferzeit'},400);o.eta=eta;o.acceptedAt=new Date().toISOString();o.deliveryDueAt=new Date(Date.parse(o.acceptedAt)+eta*60000).toISOString()}o.status=next}
  if(typeof body.paymentReceived==='boolean')o.paymentReceived=body.paymentReceived;
  o.updatedAt=new Date().toISOString();await store.setJSON(key,orders);return json({order:o});
  }
