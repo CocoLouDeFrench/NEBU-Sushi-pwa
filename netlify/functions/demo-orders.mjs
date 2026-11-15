@@ -20,19 +20,24 @@ export default async req=>{
  }
  if(body.action==='update'){
  const o=orders.find(o=>o.id===body.id);if(!o)return json({error:'Bestellung nicht gefunden'},404);
- const next=body.status;const transitions={new:['accepted','rejected'],accepted:['preparing'],preparing:['ready'],ready:['enroute'],enroute:['delivered'],delivered:[],rejected:[]};
+ const next=body.status;const transitions={new:['accepted','rejected'],accepted:['preparing'],preparing:['ready'],ready:['enroute'],enroute:['delivered','delivery_failed'],delivered:[],rejected:[],delivery_failed:[]};
  if(next===o.status)return json({order:o,unchanged:true});
  if(next&&!(transitions[o.status]||[]).includes(next))return json({error:'Bestellstatus wurde bereits geändert. Bitte Ansicht aktualisieren.'},409);
+ if(next==='delivery_failed'&&o.paymentReceived===true)return json({error:'Zahlung bereits bestätigt. Zustellung fehlgeschlagen kann nicht gewählt werden.'},409);
  if(next==='delivered'&&o.paymentMethod==='cash'&&o.paymentReceived!==true)return json({error:'Barzahlung noch offen: Bitte Zahlungseingang bestätigen, bevor du die Bestellung abschließt.'},409);
  if(next){if(next==='accepted'){const eta=Number(body.eta);if(![30,45,60,75].includes(eta))return json({error:'Ungültige Lieferzeit'},400);o.eta=eta;o.acceptedAt=new Date().toISOString();o.deliveryDueAt=new Date(Date.parse(o.acceptedAt)+eta*60000).toISOString()}o.status=next}
- if(typeof body.paymentReceived==='boolean')o.paymentReceived=body.paymentReceived;
+ if(typeof body.paymentReceived==='boolean'){
+  if(['rejected','delivery_failed'].includes(o.status))return json({error:'Bei abgelehnten oder gescheiterten Bestellungen kann keine Zahlung bestätigt werden.'},409);
+  o.paymentReceived=body.paymentReceived;
+ }
+ if(next==='delivery_failed'){o.failureReason='Zahlung verweigert';o.failedAt=new Date().toISOString();}
  o.updatedAt=new Date().toISOString();await store.setJSON(key,orders);
- if(next&&['accepted','ready','enroute','delivered'].includes(next)){
+ if(next&&['accepted','ready','enroute','delivered','delivery_failed'].includes(next)){
   try{
    const subscription=await getStore('nebu-customer-push-test').get(o.id,{type:'json'});
    const pub=Netlify.env.get('NEBU_VAPID_PUBLIC'),priv=Netlify.env.get('NEBU_VAPID_PRIVATE');
    if(subscription&&pub&&priv){
-    const messages={accepted:['Bestellung angenommen','Wir bereiten dein Sushi zu.'],ready:['Deine Bestellung ist fertig','Dein Sushi wartet auf unseren Fahrer.'],enroute:['Dein Fahrer ist unterwegs!','Dein Sushi ist auf dem Weg zu dir.'],delivered:['Deine Bestellung wurde zugestellt','Guten Appetit!']};
+    const messages={accepted:['Bestellung angenommen','Wir bereiten dein Sushi zu.'],ready:['Deine Bestellung ist fertig','Dein Sushi wartet auf unseren Fahrer.'],enroute:['Dein Fahrer ist unterwegs!','Dein Sushi ist auf dem Weg zu dir.'],delivered:['Deine Bestellung wurde zugestellt','Guten Appetit!'],delivery_failed:['Zustellung nicht abgeschlossen','Die Bestellung konnte nicht übergeben werden.']};
     webpush.setVapidDetails('mailto:test@nebusushi.com',pub,priv);
     await webpush.sendNotification(subscription,JSON.stringify({title:'NEBU Sushi · '+messages[next][0],body:messages[next][1],url:'/customer.html',tag:'nebu-customer-'+o.id+'-'+next}),{TTL:180,urgency:'normal'});
    }
