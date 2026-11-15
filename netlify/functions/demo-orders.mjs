@@ -24,7 +24,19 @@ export default async req=>{
  if(next&&!(transitions[o.status]||[]).includes(next))return json({error:'Ungültiger Statuswechsel'},409);
  if(next){if(next==='accepted'){const eta=Number(body.eta);if(![30,45,60,75].includes(eta))return json({error:'Ungültige Lieferzeit'},400);o.eta=eta;o.acceptedAt=new Date().toISOString();o.deliveryDueAt=new Date(Date.parse(o.acceptedAt)+eta*60000).toISOString()}o.status=next}
  if(typeof body.paymentReceived==='boolean')o.paymentReceived=body.paymentReceived;
- o.updatedAt=new Date().toISOString();await store.setJSON(key,orders);return json({order:o});
+ o.updatedAt=new Date().toISOString();await store.setJSON(key,orders);
+ if(next&&['accepted','ready','enroute','delivered'].includes(next)){
+  try{
+   const subscription=await getStore('nebu-customer-push-test').get(o.id,{type:'json'});
+   const pub=Netlify.env.get('NEBU_VAPID_PUBLIC'),priv=Netlify.env.get('NEBU_VAPID_PRIVATE');
+   if(subscription&&pub&&priv){
+    const messages={accepted:['Bestellung angenommen','Wir bereiten dein Sushi zu.'],ready:['Deine Bestellung ist fertig','Dein Sushi wartet auf unseren Fahrer.'],enroute:['Dein Fahrer ist unterwegs!','Dein Sushi ist auf dem Weg zu dir.'],delivered:['Deine Bestellung wurde zugestellt','Guten Appetit!']};
+    webpush.setVapidDetails('mailto:test@nebusushi.com',pub,priv);
+    await webpush.sendNotification(subscription,JSON.stringify({title:'NEBU Sushi · '+messages[next][0],body:messages[next][1],url:'/customer.html',tag:'nebu-customer-'+o.id+'-'+next}),{TTL:180,urgency:'normal'});
+   }
+  }catch(e){console.error('Customer status push failed',e.message)}
+ }
+ return json({order:o});
  }
  return json({error:'Ungültige Aktion'},400)
  }catch(e){console.error('Demo orders',e);return json({error:'Testserver-Fehler'},500)}
