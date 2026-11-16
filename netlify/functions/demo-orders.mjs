@@ -1,6 +1,7 @@
 import {checkAddress} from './delivery-check.mjs';
 import {getStore} from '@netlify/blobs';
 import webpush from 'web-push';
+function validatePhone(value){const phone=String(value||'').trim();if(!/^\+?[0-9\s()\/-]+$/.test(phone))return 'Bitte nur Ziffern und übliche Telefonnummern-Zeichen eingeben.';const digits=phone.replace(/\D/g,'');if(digits.length<7||digits.length>15)return 'Bitte eine Telefonnummer mit 7 bis 15 Ziffern eingeben.';if(/^(\d)\1{6,}$/.test(digits)||/^(?:0123456789|1234567890|9876543210|0987654321)/.test(digits))return 'Diese Telefonnummer wirkt ungültig. Bitte überprüfe sie.';if(phone.startsWith('+')&&digits.startsWith('00'))return 'Bitte die Landesvorwahl nur einmal angeben.';if(digits.startsWith('49')){const local=digits.slice(2).replace(/^0/,'');if(!/^1[567]\d{8,9}$/.test(local)&&!/^\d{3,13}$/.test(local))return 'Bitte die deutsche Telefonnummer überprüfen.';}else if(digits.startsWith('0')&&!digits.startsWith('00')){if(!/^01[567]\d{8,9}$/.test(digits)&&!/^0[2-9]\d{5,13}$/.test(digits))return 'Bitte die deutsche Telefonnummer überprüfen.';}return ''};
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{'cache-control':'no-store'}});
 export default async req=>{
  const secret=Netlify.env.get('NEBU_TEST_ADMIN_KEY');
@@ -12,7 +13,7 @@ export default async req=>{
  if(req.method!=='POST')return json({error:'Methode nicht erlaubt'},405);
  const body=await req.json();
  if(body.action==='create'){
- const phone=String(body.phone||'').trim();const digits=phone.replace(/\D/g,'');if(!/^\+?[0-9\s()\/-]+$/.test(phone)||digits.length<7||digits.length>15)return json({error:'Bitte eine gültige Telefonnummer angeben (7 bis 15 Ziffern).'},422);
+ const phone=String(body.phone||'').trim();const phoneError=validatePhone(phone);if(phoneError)return json({error:phoneError},422);
  const fulfillment=body.fulfillment==='pickup'?'pickup':'delivery';let delivery=null;if(fulfillment==='delivery'){try{delivery=await checkAddress(String(body.address||''));if(!delivery.eligible)return json({error:delivery.message,offerPickup:true},422);if(44.5<delivery.minimum)return json({error:'Mindestbestellwert '+delivery.minimum.toFixed(2)+' €',offerPickup:true},422)}catch(e){return json({error:'Lieferadresse nicht verifizierbar: '+e.message,offerPickup:true},422)}}
  const fee=fulfillment==='pickup'?0:delivery.fee;
  const items=[{name:'Der Klassiker',price:27,qty:1},{name:'Maki Box',price:17.5,qty:1}];
