@@ -1,0 +1,16 @@
+<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEBU · Sicherheitstest</title><style>body{font:16px system-ui;background:#141414;color:#fff;max-width:580px;margin:30px auto;padding:18px}main{background:#242424;padding:24px;border-radius:16px}input,button{font:inherit;padding:13px;border-radius:9px;box-sizing:border-box}input{width:100%;margin:10px 0;background:#fff}button{background:#f6c700;border:0;margin:8px 0;width:100%;font-weight:700}button:disabled{opacity:.6}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#111;padding:16px;border-radius:9px}a{color:#ffd42d}</style><main><h1>NEBU · API-Sicherheitstest</h1><p>Nur Testumgebung. Die vier Tests versuchen absichtlich manipulierte Bestellungen anzulegen. Erwartung: HTTP 422, keine Bestellung erstellt.</p><label>Test-Zugangscode<input id="key" type="password" autocomplete="off" placeholder="Test-Zugangscode"></label><button id="run">Vier Manipulationsversuche testen</button><pre id="out" role="status">Noch nicht gestartet.</pre><p><a href="/customer.html">Zur normalen Testbestellung</a></p><small>Der Code wird nur für die API-Anfragen verwendet und nicht gespeichert. Kein Test verändert die Produktivseite.</small></main><script>
+const $=x=>document.getElementById(x);
+$('run').onclick=async()=>{
+const key=$('key').value.trim();if(!key){$('out').textContent='Bitte Test-Zugangscode eingeben.';return}
+$('run').disabled=true;$('out').textContent='Tests laufen …';
+const base={action:'create',customer:'Security Test (soll abgelehnt werden)',phone:'01761234567',fulfillment:'pickup'};
+const cases=[['Liefergebühr 0 € einschleusen',{...base,fulfillment:'delivery',address:'Seydlitzstraße 55, 40476 Düsseldorf',fee:0}],['Gesamtsumme 1 € einschleusen',{...base,total:1}],['Zahlung bereits erhalten einschleusen',{...base,paymentReceived:true}],['Bestellstatus zugestellt einschleusen',{...base,status:'delivered'}]];
+let lines=[];
+for(const [name,payload] of cases){
+try{const r=await fetch('/.netlify/functions/demo-orders',{method:'POST',headers:{'content-type':'application/json','x-nebu-test-key':key},body:JSON.stringify(payload)});const d=await r.json();const ok=r.status===422&&!d.order;lines.push((ok?'BESTANDEN':'NICHT BESTANDEN')+' · '+name+' · HTTP '+r.status+' · '+(d.error||'Keine Fehlermeldung'));if(r.status===401){lines.push('Zugangscode ungültig. Test abgebrochen.');break}}
+catch(e){lines.push('NICHT AUSWERTBAR · '+name+' · '+e.message);break}
+$('out').textContent=lines.join('\n\n')
+}
+$('run').disabled=false
+};
+</script></html>
