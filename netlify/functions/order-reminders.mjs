@@ -12,27 +12,20 @@ export default async ()=>{
   try{
     const orders=await store.get('orders',{type:'json'})||[];
     const now=Date.now();
-    let changed=false;
-    for(const o of orders){
-      if(o.status!=='new'||o.reminderSentAt||!o.createdAt)continue;
-      if(now-Date.parse(o.createdAt)<5*60*1000)continue;
-      // Reserve the reminder before sending, so retries cannot spam the restaurant.
-      o.reminderSentAt=new Date(now).toISOString();
-      changed=true;
-    }
-    if(!changed)return;
+    const due=orders.filter(o=>o.status==='new'&&!o.reminderSentAt&&o.createdAt&&now-Date.parse(o.createdAt)>=5*60*1000);
+    if(!due.length)return;
+    // Only send one aggregated reminder for this batch of overdue orders.
+    const pending=orders.filter(o=>o.status==='new');
+    for(const o of due)o.reminderSentAt=new Date(now).toISOString();
     await store.setJSON('orders',orders);
     const subscription=await getStore('nebu-push-test').get('iphone-subscription',{type:'json'});
     if(!subscription)return;
-    for(const o of orders){
-      if(o.status!=='new'||!o.reminderSentAt||now-Date.parse(o.reminderSentAt)>60*1000)continue;
-      try{
-        await webpush.sendNotification(subscription,JSON.stringify({
-          title:'NEBU · Bestellung wartet auf Annahme',
-          body:'Bestellung #'+o.id+' ist seit mindestens 5 Minuten offen.',
-          url:'/',tag:'nebu-reminder-'+o.id
-        }),{TTL:180,urgency:'high'});
-      }catch(e){console.error('NEBU reminder push',o.id,e.message)}
-    }
+    try{
+      await webpush.sendNotification(subscription,JSON.stringify({
+        title:'NEBU · '+pending.length+' offene '+(pending.length===1?'Bestellung':'Bestellungen'),
+        body:pending.length===1?'Bestellung #'+pending[0].id+' wartet seit mindestens 5 Minuten auf Annahme.':pending.length+' Bestellungen warten auf Annahme. Bitte Bestellcenter prüfen.',
+        url:'/',tag:'nebu-reminders-summary'
+      }),{TTL:180,urgency:'high'});
+    }catch(e){console.error('NEBU reminder summary push',e.message)}
   }catch(e){console.error('NEBU reminder schedule',e)}
 };
