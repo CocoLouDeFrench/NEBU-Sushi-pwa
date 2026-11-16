@@ -1,3 +1,4 @@
+import {checkAddress} from './delivery-check.mjs';
 import {getStore} from '@netlify/blobs';
 import webpush from 'web-push';
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{'cache-control':'no-store'}});
@@ -11,11 +12,13 @@ export default async req=>{
  if(req.method!=='POST')return json({error:'Methode nicht erlaubt'},405);
  const body=await req.json();
  if(body.action==='create'){
+ const fulfillment=body.fulfillment==='pickup'?'pickup':'delivery';let delivery=null;if(fulfillment==='delivery'){try{delivery=await checkAddress(String(body.address||''));if(!delivery.eligible)return json({error:delivery.message,offerPickup:true},422);if(44.5<delivery.minimum)return json({error:'Mindestbestellwert '+delivery.minimum.toFixed(2)+' €',offerPickup:true},422)}catch(e){return json({error:'Lieferadresse nicht verifizierbar: '+e.message,offerPickup:true},422)}}
+ const fee=fulfillment==='pickup'?0:delivery.fee;
  const items=[{name:'Der Klassiker',price:27,qty:1},{name:'Maki Box',price:17.5,qty:1}];
- const order={id:'T'+Date.now().toString(36).toUpperCase(),customer:String(body.customer||'Testkunde').slice(0,80),address:String(body.address||'Testadresse Düsseldorf').slice(0,150),items,subtotal:44.5,fee:3.5,total:48,paymentMethod:'cash',paymentReceived:false,status:'new',reminderSentAt:null,eta:null,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+ const order={id:'T'+Date.now().toString(36).toUpperCase(),customer:String(body.customer||'Testkunde').slice(0,80),address:String(body.address||'Testadresse Düsseldorf').slice(0,150),items,subtotal:44.5,fee,total:44.5+fee,fulfillment,routeKm:delivery?.km??null,paymentMethod:'cash',paymentReceived:false,status:'new',reminderSentAt:null,eta:null,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
  orders.unshift(order);await store.setJSON(key,orders.slice(0,100));
  let push='not-registered';
- try{const sub=await getStore('nebu-push-test').get('iphone-subscription',{type:'json'});if(sub&&Netlify.env.get('NEBU_VAPID_PUBLIC')&&Netlify.env.get('NEBU_VAPID_PRIVATE')){webpush.setVapidDetails('mailto:test@nebusushi.com',Netlify.env.get('NEBU_VAPID_PUBLIC'),Netlify.env.get('NEBU_VAPID_PRIVATE'));await webpush.sendNotification(sub,JSON.stringify({title:'NEBU – Neue Testbestellung '+order.id,body:'48,00 € · Jetzt annehmen oder ablehnen',url:'/'}),{TTL:120,urgency:'high'});push='sent'}}catch(e){console.error('Demo push error',e.message);push='failed'}
+ try{const sub=await getStore('nebu-push-test').get('iphone-subscription',{type:'json'});if(sub&&Netlify.env.get('NEBU_VAPID_PUBLIC')&&Netlify.env.get('NEBU_VAPID_PRIVATE')){webpush.setVapidDetails('mailto:test@nebusushi.com',Netlify.env.get('NEBU_VAPID_PUBLIC'),Netlify.env.get('NEBU_VAPID_PRIVATE'));await webpush.sendNotification(sub,JSON.stringify({title:'NEBU – Neue Testbestellung '+order.id,body:order.total.toFixed(2).replace('.',',')+' € · '+(fulfillment==='pickup'?'Abholung':'Lieferung')+' · Jetzt annehmen oder ablehnen',url:'/'}),{TTL:120,urgency:'high'});push='sent'}}catch(e){console.error('Demo push error',e.message);push='failed'}
  return json({order,push},201);
  }
  if(body.action==='update'){
