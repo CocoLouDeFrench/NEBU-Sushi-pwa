@@ -5,15 +5,20 @@ import webpush from 'web-push';
 function validatePhone(value){const phone=String(value||'').trim();if(!/^\+?[0-9\s()\/-]+$/.test(phone))return 'Bitte nur Ziffern und übliche Telefonnummern-Zeichen eingeben.';const digits=phone.replace(/\D/g,'');if(digits.length<7||digits.length>15)return 'Bitte eine Telefonnummer mit 7 bis 15 Ziffern eingeben.';if(/^(\d)\1{6,}$/.test(digits)||/^(?:0123456789|1234567890|9876543210|0987654321)/.test(digits))return 'Diese Telefonnummer wirkt ungültig. Bitte überprüfe sie.';if(phone.startsWith('+')&&digits.startsWith('00'))return 'Bitte die Landesvorwahl nur einmal angeben.';if(digits.startsWith('49')){const local=digits.slice(2).replace(/^0/,'');if(!/^1[567]\d{8,9}$/.test(local)&&!/^\d{3,13}$/.test(local))return 'Bitte die deutsche Telefonnummer überprüfen.';}else if(digits.startsWith('0')&&!digits.startsWith('00')){if(!/^01[567]\d{8,9}$/.test(digits)&&!/^0[2-9]\d{5,13}$/.test(digits))return 'Bitte die deutsche Telefonnummer überprüfen.';}return ''};
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{'cache-control':'no-store'}});
 export default async req=>{
- const secret=Netlify.env.get('NEBU_TEST_ADMIN_KEY');
- if(!secret||req.headers.get('x-nebu-test-key')!==secret)return json({error:'Test-Zugangscode ungültig'},401);
+ const adminKey=Netlify.env.get('NEBU_TEST_ADMIN_KEY');
+ const customerKey=Netlify.env.get('NEBU_TEST_CUSTOMER_KEY');
+ const suppliedKey=req.headers.get('x-nebu-test-key');
+ const isAdmin=Boolean(adminKey&&suppliedKey===adminKey);
+ const isCustomer=Boolean(customerKey&&suppliedKey===customerKey&&customerKey!==adminKey);
  const store=getStore('nebu-orders-demo');const key='orders';
  try{
  const orders=await store.get(key,{type:'json'})||[];
- if(req.method==='GET')return json({orders});
+ if(req.method==='GET'){if(!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);return json({orders:orders.map(({customerToken,...order})=>order)});}
  if(req.method!=='POST')return json({error:'Methode nicht erlaubt'},405);
  const body=await req.json();
+ if(body.action==='status'){const order=orders.find(o=>o.id===body.id);if(!order||!body.token||body.token!==order.customerToken)return json({error:'Bestellung nicht gefunden oder Zugriff verweigert'},403);const {customerToken,customer,email,phone,address,bell,floor,notes,riskFlag,...safe}=order;return json({order:safe});}
  if(body.action==='create'){
+ if(!isCustomer)return json({error:'Kunden-Zugangscode ungültig'},401);
  const protectedFields=['fee','total','subtotal','routeKm','minimum','eligible','subtotal','paymentReceived','paymentMethod','status','riskFlag','delivery','deliveryQuote','acceptedAt','createdAt','updatedAt'];
  const injected=protectedFields.filter(field=>Object.prototype.hasOwnProperty.call(body,field));
  if(injected.length)return json({error:'Manipulierte Bestelldaten: Preis-, Liefer-, Zahlungs- und Statuswerte dürfen nicht vom Kunden vorgegeben werden.'},422);
@@ -25,13 +30,15 @@ export default async req=>{
  const normalizedPhone=phone.replace(/\D/g,'').replace(/^49(?=1[567])/, '0');const recentMatches=orders.filter(o=>String(o.phone||'').replace(/\D/g,'').replace(/^49(?=1[567])/, '0')===normalizedPhone&&Date.now()-Date.parse(o.createdAt)<10*60*1000&&Date.now()-Date.parse(o.createdAt)>=0).length;const normalizeAddress=value=>String(value||'').toLocaleLowerCase('de-DE').normalize('NFKC').replace(/straße|strasse|str\./g,'str').replace(/[^a-z0-9äöüß]/g,'');const addressKey=fulfillment==='delivery'?normalizeAddress(body.address):'';const addressMatches=addressKey?orders.filter(o=>o.fulfillment==='delivery'&&normalizeAddress(o.address)===addressKey&&Date.now()-Date.parse(o.createdAt)<10*60*1000&&Date.now()-Date.parse(o.createdAt)>=0).length:0;const reasons=[];if(recentMatches>=2)reasons.push('Mindestens 3 Bestellungen mit derselben Telefonnummer innerhalb von 10 Minuten.');if(addressMatches>=2)reasons.push('Mindestens 3 Lieferbestellungen an dieselbe Adresse innerhalb von 10 Minuten.');const riskFlag=reasons.length?{level:'review',reason:reasons.join(' '),recentCount:Math.max(recentMatches,addressMatches)+1}:null;
  const fee=fulfillment==='pickup'?0:delivery.fee;
 
- const order={id:'T'+Date.now().toString(36).toUpperCase(),customer,email,phone,notes,floor:fulfillment==='delivery'?floor:'',bell:fulfillment==='delivery'?bell:'',riskFlag,address:fulfillment==='pickup'?'':String(body.address||'').slice(0,150),items,subtotal:subtotalCents/100,fee,total:(subtotalCents+Math.round(fee*100))/100,fulfillment,routeKm:delivery?.km??null,paymentMethod:'cash',paymentReceived:false,status:'new',reminderSentAt:null,eta:null,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+ const customerToken=crypto.randomUUID()+crypto.randomUUID();
+ const order={customerToken,id:'T'+Date.now().toString(36).toUpperCase(),customer,email,phone,notes,floor:fulfillment==='delivery'?floor:'',bell:fulfillment==='delivery'?bell:'',riskFlag,address:fulfillment==='pickup'?'':String(body.address||'').slice(0,150),items,subtotal:subtotalCents/100,fee,total:(subtotalCents+Math.round(fee*100))/100,fulfillment,routeKm:delivery?.km??null,paymentMethod:'cash',paymentReceived:false,status:'new',reminderSentAt:null,eta:null,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
  orders.unshift(order);await store.setJSON(key,orders.slice(0,100));
  let push='not-registered';
  try{const sub=await getStore('nebu-push-test').get('iphone-subscription',{type:'json'});if(sub&&Netlify.env.get('NEBU_VAPID_PUBLIC')&&Netlify.env.get('NEBU_VAPID_PRIVATE')){webpush.setVapidDetails('mailto:test@nebusushi.com',Netlify.env.get('NEBU_VAPID_PUBLIC'),Netlify.env.get('NEBU_VAPID_PRIVATE'));await webpush.sendNotification(sub,JSON.stringify({title:'NEBU – Neue Testbestellung '+order.id,body:order.total.toFixed(2).replace('.',',')+' € · '+(fulfillment==='pickup'?'Abholung':'Lieferung')+' · Jetzt annehmen oder ablehnen',url:'/'}),{TTL:120,urgency:'high'});push='sent'}}catch(e){console.error('Demo push error',e.message);push='failed'}
- return json({order,push},201);
+ const {customerToken:token,...safeOrder}=order;return json({order:safeOrder,token,push},201);
  }
  if(body.action==='update'){
+ if(!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);
  const o=orders.find(o=>o.id===body.id);if(!o)return json({error:'Bestellung nicht gefunden'},404);
  const next=body.status;const transitions={new:['accepted','rejected'],accepted:['preparing'],preparing:['ready'],ready:o.fulfillment==='pickup'?['picked_up']:['enroute'],picked_up:[],enroute:o.fulfillment==='pickup'?['picked_up']:['delivered','delivery_failed'],delivered:[],rejected:[],delivery_failed:[]};
  if(o.fulfillment==='pickup'&&['enroute','delivered','delivery_failed'].includes(next))return json({error:'Für Selbstabholung ist dieser Lieferstatus nicht erlaubt.'},409);if(o.fulfillment!=='pickup'&&next==='picked_up')return json({error:'Abholung nur für Abholbestellungen erlaubt.'},409);if(next===o.status)return json({order:o,unchanged:true});
