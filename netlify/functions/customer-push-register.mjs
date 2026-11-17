@@ -1,8 +1,6 @@
 import {getStore} from '@netlify/blobs';
 export default async req=>{
  if(req.method!=='POST')return Response.json({error:'Methode nicht erlaubt'},{status:405});
- const secret=Netlify.env.get('NEBU_TEST_CUSTOMER_KEY');
- if(!secret||secret===Netlify.env.get('NEBU_TEST_ADMIN_KEY')||req.headers.get('x-nebu-test-key')!==secret)return Response.json({error:'Kunden-Zugangscode ungültig'},{status:401});
  try{
   const {orderId,token,subscription}=await req.json();
   if(!/^T[A-Z0-9]{5,30}$/.test(String(orderId||''))||!subscription?.endpoint?.startsWith('https://')||!subscription.keys?.p256dh||!subscription.keys?.auth)return Response.json({error:'Ungültige Registrierung'},{status:400});
