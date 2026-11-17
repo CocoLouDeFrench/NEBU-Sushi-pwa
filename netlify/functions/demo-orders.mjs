@@ -48,7 +48,22 @@ export default async req=>{
  const order={requestId,customerToken,version:0,id:'T'+Date.now().toString(36).toUpperCase(),customer,email,phone,notes,floor:fulfillment==='delivery'?floor:'',bell:fulfillment==='delivery'?bell:'',riskFlag,address:fulfillment==='pickup'?'':String(body.address||'').slice(0,150),items,subtotal:subtotalCents/100,fee,total:(subtotalCents+Math.round(fee*100))/100,fulfillment,routeKm:delivery?.km??null,paymentMethod:'cash',paymentReceived:false,status:'new',reminderSentAt:null,eta:null,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
  orders.unshift(order);await store.setJSON(key,orders.slice(0,100));
  let push='not-registered';
- try{const sub=await getStore('nebu-push-test').get('iphone-subscription',{type:'json'});if(sub&&Netlify.env.get('NEBU_VAPID_PUBLIC')&&Netlify.env.get('NEBU_VAPID_PRIVATE')){webpush.setVapidDetails('mailto:test@nebusushi.com',Netlify.env.get('NEBU_VAPID_PUBLIC'),Netlify.env.get('NEBU_VAPID_PRIVATE'));await webpush.sendNotification(sub,JSON.stringify({title:'NEBU – Neue Testbestellung '+order.id,body:order.total.toFixed(2).replace('.',',')+' € · '+(fulfillment==='pickup'?'Abholung':'Lieferung')+' · Jetzt annehmen oder ablehnen',url:'/'}),{TTL:120,urgency:'high'});push='sent'}}catch(e){console.error('Demo push error',e.message);push='failed'}
+ try{
+  const pushStore=getStore('nebu-push-test');
+  const subscriptions=await pushStore.get('admin-subscriptions',{type:'json'})||[];
+  const legacy=await pushStore.get('iphone-subscription',{type:'json'});
+  const all=[...subscriptions,...(legacy?[legacy]:[])].filter((sub,i,a)=>sub?.endpoint&&a.findIndex(x=>x?.endpoint===sub.endpoint)===i);
+  const pub=Netlify.env.get('NEBU_VAPID_PUBLIC'),priv=Netlify.env.get('NEBU_VAPID_PRIVATE');
+  if(all.length&&pub&&priv){
+   webpush.setVapidDetails('mailto:test@nebusushi.com',pub,priv);
+   const payload=JSON.stringify({title:'NEBU – Neue Testbestellung '+order.id,body:order.total.toFixed(2).replace('.',',')+' € · '+(fulfillment==='pickup'?'Abholung':'Lieferung')+' · Jetzt annehmen oder ablehnen',url:'/'});
+   const results=await Promise.allSettled(all.map(sub=>webpush.sendNotification(sub,payload,{TTL:120,urgency:'high'})));
+   push=results.some(x=>x.status==='fulfilled')?'sent':'failed';
+   const stale=results.flatMap((x,i)=>x.status==='rejected'&&[404,410].includes(x.reason?.statusCode)?[all[i].endpoint]:[]);
+   if(stale.length)await pushStore.setJSON('admin-subscriptions',subscriptions.filter(sub=>!stale.includes(sub.endpoint)));
+   for(const result of results)if(result.status==='rejected')console.error('Demo admin push failed',result.reason?.message);
+  }
+ }catch(e){console.error('Demo push error',e.message);push='failed'}
  const {customerToken:token,...safeOrder}=order;return json({order:safeOrder,token,push},201);
  }
  if(body.action==='update'){
