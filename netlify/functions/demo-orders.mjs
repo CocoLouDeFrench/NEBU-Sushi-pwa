@@ -26,12 +26,12 @@ export default async req=>{
  if(!isCustomer){
   const ip=req.headers.get('x-nf-client-connection-ip');
   if(!ip)return json({error:'Öffentliche Bestellung derzeit nicht verfügbar.'},503);
-  const limiter=getStore('nebu-public-order-limits');
+  const limiter=getStore('nebu-public-order-limits-v2');
   const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(ip)))).map(b=>b.toString(16).padStart(2,'0')).join('');
   const bucket='ip-'+digest;
   const now=Date.now();
   const recent=(await limiter.get(bucket,{type:'json'})||[]).filter(t=>Number.isFinite(t)&&now-t<86400000&&now>=t);
-  if(recent.filter(t=>now-t<900000).length>=3||recent.length>=10)return json({error:'Zu viele Testbestellungen. Bitte später erneut versuchen.'},429);
+  if(recent.filter(t=>now-t<900000).length>=20||recent.length>=100)return json({error:'Zu viele Testbestellungen. Bitte später erneut versuchen.'},429);
   if(body.website||body.company)return json({error:'Bestellung konnte nicht verarbeitet werden.'},422);
   // Test-only throttle: non-atomic, not suitable for public production.
   await limiter.setJSON(bucket,[...recent,now]);
