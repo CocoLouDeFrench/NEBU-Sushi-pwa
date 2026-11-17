@@ -18,7 +18,19 @@ export default async req=>{
  const body=await req.json();
  if(body.action==='status'){const order=orders.find(o=>o.id===body.id);if(!order||!body.token||body.token!==order.customerToken)return json({error:'Bestellung nicht gefunden oder Zugriff verweigert'},403);const {customerToken,customer,email,phone,address,bell,floor,notes,riskFlag,...safe}=order;return json({order:safe});}
  if(body.action==='create'){
- if(!isCustomer)return json({error:'Kunden-Zugangscode ungültig'},401);
+ if(!isCustomer){
+  const ip=req.headers.get('x-nf-client-connection-ip');
+  if(!ip)return json({error:'Öffentliche Bestellung derzeit nicht verfügbar.'},503);
+  const limiter=getStore('nebu-public-order-limits');
+  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(ip)))).map(b=>b.toString(16).padStart(2,'0')).join('');
+  const bucket='ip-'+digest;
+  const now=Date.now();
+  const recent=(await limiter.get(bucket,{type:'json'})||[]).filter(t=>Number.isFinite(t)&&now-t<86400000&&now>=t);
+  if(recent.filter(t=>now-t<900000).length>=3||recent.length>=10)return json({error:'Zu viele Testbestellungen. Bitte später erneut versuchen.'},429);
+  if(body.website||body.company)return json({error:'Bestellung konnte nicht verarbeitet werden.'},422);
+  // Test-only throttle: non-atomic, not suitable for public production.
+  await limiter.setJSON(bucket,[...recent,now]);
+ }
  const protectedFields=['fee','total','subtotal','routeKm','minimum','eligible','subtotal','paymentReceived','paymentMethod','status','riskFlag','delivery','deliveryQuote','acceptedAt','createdAt','updatedAt'];
  const injected=protectedFields.filter(field=>Object.prototype.hasOwnProperty.call(body,field));
  if(injected.length)return json({error:'Manipulierte Bestelldaten: Preis-, Liefer-, Zahlungs- und Statuswerte dürfen nicht vom Kunden vorgegeben werden.'},422);
