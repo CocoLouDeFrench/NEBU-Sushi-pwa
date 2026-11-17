@@ -12,12 +12,7 @@ export default async req=>{
  const isCustomer=Boolean(customerKey&&suppliedKey===customerKey&&customerKey!==adminKey);
  const store=getStore('nebu-orders-demo');const key='orders';
  try{
- const snapshot=await store.getWithMetadata(key,{type:'json',consistency:'strong'});
- const orders=snapshot?.data||[];
- const persistOrders=async nextOrders=>{
-  const result=await store.setJSON(key,nextOrders,snapshot?.etag?{onlyIfMatch:snapshot.etag}:{onlyIfNew:true});
-  return result.modified===true;
- };
+ const orders=await store.get(key,{type:'json'})||[];
  if(req.method==='GET'){if(!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);return json({orders:orders.map(({customerToken,...order})=>order)});}
  if(req.method!=='POST')return json({error:'Methode nicht erlaubt'},405);
  const body=await req.json();
@@ -51,7 +46,7 @@ export default async req=>{
 
  const customerToken=crypto.randomUUID()+crypto.randomUUID();
  const order={requestId,customerToken,version:0,id:'T'+Date.now().toString(36).toUpperCase(),customer,email,phone,notes,floor:fulfillment==='delivery'?floor:'',bell:fulfillment==='delivery'?bell:'',riskFlag,address:fulfillment==='pickup'?'':String(body.address||'').slice(0,150),items,subtotal:subtotalCents/100,fee,total:(subtotalCents+Math.round(fee*100))/100,fulfillment,routeKm:delivery?.km??null,paymentMethod:'cash',paymentReceived:false,status:'new',reminderSentAt:null,eta:null,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
- orders.unshift(order);if(!await persistOrders(orders.slice(0,100)))return json({error:'Gleichzeitige Bestellung erkannt. Bitte erneut versuchen.'},409);
+ orders.unshift(order);await store.setJSON(key,orders.slice(0,100));
  let push='not-registered';
  try{
   const pushStore=getStore('nebu-push-test');
@@ -87,7 +82,7 @@ export default async req=>{
   o.paymentReceived=body.paymentReceived;
  }
  if(next==='delivery_failed'){o.failureReason='Zahlung verweigert';o.failedAt=new Date().toISOString();}
- o.version=(o.version??0)+1;o.updatedAt=new Date().toISOString();if(!await persistOrders(orders))return json({error:'Bestellung wurde gleichzeitig auf einem anderen Gerät geändert. Bitte aktualisieren.'},409);
+ o.version=(o.version??0)+1;o.updatedAt=new Date().toISOString();await store.setJSON(key,orders);
  if(next&&['accepted','preparing','ready','enroute','delivered','picked_up','delivery_failed','rejected'].includes(next)){
   try{
    const subscription=await getStore('nebu-customer-push-test').get(o.id,{type:'json'});
