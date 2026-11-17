@@ -45,7 +45,7 @@ export default async req=>{
  const fee=fulfillment==='pickup'?0:delivery.fee;
 
  const customerToken=crypto.randomUUID()+crypto.randomUUID();
- const order={requestId,customerToken,id:'T'+Date.now().toString(36).toUpperCase(),customer,email,phone,notes,floor:fulfillment==='delivery'?floor:'',bell:fulfillment==='delivery'?bell:'',riskFlag,address:fulfillment==='pickup'?'':String(body.address||'').slice(0,150),items,subtotal:subtotalCents/100,fee,total:(subtotalCents+Math.round(fee*100))/100,fulfillment,routeKm:delivery?.km??null,paymentMethod:'cash',paymentReceived:false,status:'new',reminderSentAt:null,eta:null,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+ const order={requestId,customerToken,version:0,id:'T'+Date.now().toString(36).toUpperCase(),customer,email,phone,notes,floor:fulfillment==='delivery'?floor:'',bell:fulfillment==='delivery'?bell:'',riskFlag,address:fulfillment==='pickup'?'':String(body.address||'').slice(0,150),items,subtotal:subtotalCents/100,fee,total:(subtotalCents+Math.round(fee*100))/100,fulfillment,routeKm:delivery?.km??null,paymentMethod:'cash',paymentReceived:false,status:'new',reminderSentAt:null,eta:null,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
  orders.unshift(order);await store.setJSON(key,orders.slice(0,100));
  let push='not-registered';
  try{const sub=await getStore('nebu-push-test').get('iphone-subscription',{type:'json'});if(sub&&Netlify.env.get('NEBU_VAPID_PUBLIC')&&Netlify.env.get('NEBU_VAPID_PRIVATE')){webpush.setVapidDetails('mailto:test@nebusushi.com',Netlify.env.get('NEBU_VAPID_PUBLIC'),Netlify.env.get('NEBU_VAPID_PRIVATE'));await webpush.sendNotification(sub,JSON.stringify({title:'NEBU – Neue Testbestellung '+order.id,body:order.total.toFixed(2).replace('.',',')+' € · '+(fulfillment==='pickup'?'Abholung':'Lieferung')+' · Jetzt annehmen oder ablehnen',url:'/'}),{TTL:120,urgency:'high'});push='sent'}}catch(e){console.error('Demo push error',e.message);push='failed'}
@@ -54,6 +54,7 @@ export default async req=>{
  if(body.action==='update'){
  if(!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);
  const o=orders.find(o=>o.id===body.id);if(!o)return json({error:'Bestellung nicht gefunden'},404);
+ if(!Number.isInteger(body.expectedVersion)||body.expectedVersion!==(o.version??0))return json({error:'Bestellung wurde auf einem anderen Gerät geändert. Bitte aktualisieren.'},409);
  const next=body.status;const transitions={new:['accepted','rejected'],accepted:['preparing'],preparing:['ready'],ready:o.fulfillment==='pickup'?['picked_up']:['enroute'],picked_up:[],enroute:o.fulfillment==='pickup'?['picked_up']:['delivered','delivery_failed'],delivered:[],rejected:[],delivery_failed:[]};
  if(o.fulfillment==='pickup'&&['enroute','delivered','delivery_failed'].includes(next))return json({error:'Für Selbstabholung ist dieser Lieferstatus nicht erlaubt.'},409);if(o.fulfillment!=='pickup'&&next==='picked_up')return json({error:'Abholung nur für Abholbestellungen erlaubt.'},409);if(next===o.status)return json({order:o,unchanged:true});
  if(next&&!(transitions[o.status]||[]).includes(next))return json({error:'Bestellstatus wurde bereits geändert. Bitte Ansicht aktualisieren.'},409);
@@ -66,7 +67,7 @@ export default async req=>{
   o.paymentReceived=body.paymentReceived;
  }
  if(next==='delivery_failed'){o.failureReason='Zahlung verweigert';o.failedAt=new Date().toISOString();}
- o.updatedAt=new Date().toISOString();await store.setJSON(key,orders);
+ o.version=(o.version??0)+1;o.updatedAt=new Date().toISOString();await store.setJSON(key,orders);
  if(next&&['accepted','preparing','ready','enroute','delivered','picked_up','delivery_failed','rejected'].includes(next)){
   try{
    const subscription=await getStore('nebu-customer-push-test').get(o.id,{type:'json'});
