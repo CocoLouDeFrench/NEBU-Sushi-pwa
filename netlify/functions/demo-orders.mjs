@@ -12,11 +12,10 @@ export default async req=>{
  const isCustomer=Boolean(customerKey&&suppliedKey===customerKey&&customerKey!==adminKey);
  const store=getStore('nebu-orders-demo');const key='orders';
  try{
- const snapshot=await store.getWithMetadata(key,{type:'json',consistency:'strong'});
- const orders=snapshot?.data||[];
+ const orders=await store.get(key,{type:'json'})||[];
  const persistOrders=async value=>{
-  const result=await store.setJSON(key,value,snapshot?{onlyIfMatch:snapshot.etag}:{onlyIfNew:true});
-  return result.modified===true&&Boolean(result.etag);
+  await store.setJSON(key,value);
+  return true;
  };
  if(req.method==='GET'){if(!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);return json({orders:orders.map(({customerToken,...order})=>order)});}
  if(req.method!=='POST')return json({error:'Methode nicht erlaubt'},405);
