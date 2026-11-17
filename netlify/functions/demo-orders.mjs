@@ -73,8 +73,12 @@ export default async req=>{
  if(body.action==='update'){
  if(!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);
  const o=orders.find(o=>o.id===body.id);if(!o)return json({error:'Bestellung nicht gefunden'},404);
+ const next=body.status;
+ // Repeated action from another staff device: report the current order, never send a second push.
+ if(next&&next===o.status&&(body.paymentReceived===undefined||body.paymentReceived===o.paymentReceived))return json({order:o,unchanged:true,alreadyApplied:true});
+ if(!next&&typeof body.paymentReceived==='boolean'&&body.paymentReceived===o.paymentReceived)return json({order:o,unchanged:true,alreadyApplied:true});
  if(!Number.isInteger(body.expectedVersion)||body.expectedVersion!==(o.version??0))return json({error:'Bestellung wurde auf einem anderen Gerät geändert. Bitte aktualisieren.'},409);
- const next=body.status;const transitions={new:['accepted','rejected'],accepted:['preparing'],preparing:['ready'],ready:o.fulfillment==='pickup'?['picked_up']:['enroute'],picked_up:[],enroute:o.fulfillment==='pickup'?['picked_up']:['delivered','delivery_failed'],delivered:[],rejected:[],delivery_failed:[]};
+const transitions={new:['accepted','rejected'],accepted:['preparing'],preparing:['ready'],ready:o.fulfillment==='pickup'?['picked_up']:['enroute'],picked_up:[],enroute:o.fulfillment==='pickup'?['picked_up']:['delivered','delivery_failed'],delivered:[],rejected:[],delivery_failed:[]};
  if(o.fulfillment==='pickup'&&['enroute','delivered','delivery_failed'].includes(next))return json({error:'Für Selbstabholung ist dieser Lieferstatus nicht erlaubt.'},409);if(o.fulfillment!=='pickup'&&next==='picked_up')return json({error:'Abholung nur für Abholbestellungen erlaubt.'},409);if(next===o.status)return json({order:o,unchanged:true});
  if(next&&!(transitions[o.status]||[]).includes(next))return json({error:'Bestellstatus wurde bereits geändert. Bitte Ansicht aktualisieren.'},409);
  if(next==='delivery_failed'&&o.paymentReceived===true)return json({error:'Zahlung bereits bestätigt. Zustellung fehlgeschlagen kann nicht gewählt werden.'},409);
