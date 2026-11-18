@@ -1,6 +1,7 @@
 import {lookup} from './nebu-catalog.mjs';
 import {checkAddress} from './delivery-check.mjs';
 import {getStore} from '@netlify/blobs';
+import {getDatabase} from '@netlify/database';
 import webpush from 'web-push';
 function validatePhone(value){const phone=String(value||'').trim();if(!/^\+?[0-9\s()\/-]+$/.test(phone))return 'Bitte nur Ziffern und übliche Telefonnummern-Zeichen eingeben.';const digits=phone.replace(/\D/g,'');if(digits.length<7||digits.length>15)return 'Bitte eine Telefonnummer mit 7 bis 15 Ziffern eingeben.';if(/^(\d)\1{6,}$/.test(digits)||/^(?:0123456789|1234567890|9876543210|0987654321)/.test(digits))return 'Diese Telefonnummer wirkt ungültig. Bitte überprüfe sie.';if(phone.startsWith('+')&&digits.startsWith('00'))return 'Bitte die Landesvorwahl nur einmal angeben.';if(digits.startsWith('49')){const local=digits.slice(2).replace(/^0/,'');if(!/^1[567]\d{8,9}$/.test(local)&&!/^\d{3,13}$/.test(local))return 'Bitte die deutsche Telefonnummer überprüfen.';}else if(digits.startsWith('0')&&!digits.startsWith('00')){if(!/^01[567]\d{8,9}$/.test(digits)&&!/^0[2-9]\d{5,13}$/.test(digits))return 'Bitte die deutsche Telefonnummer überprüfen.';}return ''};
 const json=(x,s=200)=>Response.json(x,{status:s,headers:{'cache-control':'no-store'}});
@@ -10,11 +11,25 @@ export default async req=>{
  const suppliedKey=req.headers.get('x-nebu-test-key');
  const isAdmin=Boolean(adminKey&&suppliedKey===adminKey);
  const isCustomer=Boolean(customerKey&&suppliedKey===customerKey&&customerKey!==adminKey);
- const store=getStore('nebu-orders-demo');const key='orders';
+ const db=getDatabase();let client=null;
  try{
- const orders=await store.get(key,{type:'json'})||[];
+ // A row-level PostgreSQL lock makes every write to the test queue serial.
+ // Old Blobs orders are imported on the first committed write.
+ let orders;
+ if(req.method==='GET'){
+  const result=await db.sql`SELECT orders, migrated FROM nebu_test_order_state WHERE id = 1`;
+  orders=result[0]?.migrated?result[0].orders:(await getStore('nebu-orders-demo').get('orders',{type:'json'})||[]);
+ }else{
+  client=await db.pool.connect();
+  await client.query('BEGIN');
+  const result=await client.query('SELECT orders, migrated FROM nebu_test_order_state WHERE id = 1 FOR UPDATE');
+  if(result.rows.length!==1)throw Error('NEBU test orders migration not applied');
+  orders=result.rows[0].migrated?result.rows[0].orders:(await getStore('nebu-orders-demo').get('orders',{type:'json'})||[]);
+ }
  const persistOrders=async value=>{
-  await store.setJSON(key,value);
+  if(!client)throw Error('Missing order transaction');
+  await client.query('UPDATE nebu_test_order_state SET orders = $1::jsonb, migrated = TRUE WHERE id = 1',[JSON.stringify(value)]);
+  await client.query('COMMIT');client.release();client=null;
   return true;
  };
  if(req.method==='GET'){if(!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);return json({orders:orders.map(({customerToken,...order})=>order)});}
@@ -75,11 +90,11 @@ export default async req=>{
  const o=orders.find(o=>o.id===body.id);if(!o)return json({error:'Bestellung nicht gefunden'},404);
  const next=body.status;
  // Repeated action from another staff device: report the current order, never send a second push.
- if(next&&next===o.status&&(body.paymentReceived===undefined||body.paymentReceived===o.paymentReceived))return json({order:o,unchanged:true,alreadyApplied:true});
- if(!next&&typeof body.paymentReceived==='boolean'&&body.paymentReceived===o.paymentReceived)return json({order:o,unchanged:true,alreadyApplied:true});
+ if(next&&next===o.status&&(body.paymentReceived===undefined||body.paymentReceived===o.paymentReceived)){const {customerToken,...safe}=o;return json({order:safe,unchanged:true,alreadyApplied:true});}
+ if(!next&&typeof body.paymentReceived==='boolean'&&body.paymentReceived===o.paymentReceived){const {customerToken,...safe}=o;return json({order:safe,unchanged:true,alreadyApplied:true});}
  if(!Number.isInteger(body.expectedVersion)||body.expectedVersion!==(o.version??0))return json({error:'Bestellung wurde auf einem anderen Gerät geändert. Bitte aktualisieren.'},409);
 const transitions={new:['accepted','rejected'],accepted:['preparing'],preparing:['ready'],ready:o.fulfillment==='pickup'?['picked_up']:['enroute'],picked_up:[],enroute:o.fulfillment==='pickup'?['picked_up']:['delivered','delivery_failed'],delivered:[],rejected:[],delivery_failed:[]};
- if(o.fulfillment==='pickup'&&['enroute','delivered','delivery_failed'].includes(next))return json({error:'Für Selbstabholung ist dieser Lieferstatus nicht erlaubt.'},409);if(o.fulfillment!=='pickup'&&next==='picked_up')return json({error:'Abholung nur für Abholbestellungen erlaubt.'},409);if(next===o.status)return json({order:o,unchanged:true});
+ if(o.fulfillment==='pickup'&&['enroute','delivered','delivery_failed'].includes(next))return json({error:'Für Selbstabholung ist dieser Lieferstatus nicht erlaubt.'},409);if(o.fulfillment!=='pickup'&&next==='picked_up')return json({error:'Abholung nur für Abholbestellungen erlaubt.'},409);if(next===o.status){const {customerToken,...safe}=o;return json({order:safe,unchanged:true});}
  if(next&&!(transitions[o.status]||[]).includes(next))return json({error:'Bestellstatus wurde bereits geändert. Bitte Ansicht aktualisieren.'},409);
  if(next==='delivery_failed'&&o.paymentReceived===true)return json({error:'Zahlung bereits bestätigt. Zustellung fehlgeschlagen kann nicht gewählt werden.'},409);
  if((next==='delivered'||next==='picked_up')&&o.paymentMethod==='cash'&&o.paymentReceived!==true)return json({error:'Barzahlung noch offen: Bitte Zahlungseingang bestätigen, bevor du die Bestellung abschließt.'},409);
@@ -102,8 +117,9 @@ const transitions={new:['accepted','rejected'],accepted:['preparing'],preparing:
    }
   }catch(e){console.error('Customer status push failed',e.message)}
  }
- return json({order:o});
+ const {customerToken,...safe}=o;return json({order:safe});
  }
  return json({error:'Ungültige Aktion'},400)
  }catch(e){console.error('Demo orders',e);return json({error:'Testserver-Fehler'},500)}
+ finally{if(client){try{await client.query('ROLLBACK')}catch(e){console.error('Demo rollback',e)}client.release()}}
 };
