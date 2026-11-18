@@ -113,6 +113,8 @@ export default async req=>{
  if(!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);
  const o=orders.find(o=>o.id===body.id);if(!o)return json({error:'Bestellung nicht gefunden'},404);
  const next=body.status;
+ if(body.paymentReceived!==undefined&&typeof body.paymentReceived!=='boolean')return json({error:'Ungültiger Zahlungsstatus'},422);
+ if(body.paymentReceived!==undefined&&['delivered','picked_up','rejected','delivery_failed'].includes(o.status)&&body.paymentReceived!==o.paymentReceived)return json({error:'Abgeschlossene Bestellungen können nicht nachträglich über diese Funktion umgebucht werden.'},409);
  // Repeated action from another staff device: report the current order, never send a second push.
  if(next&&next===o.status&&(body.paymentReceived===undefined||body.paymentReceived===o.paymentReceived)){const {customerToken,...safe}=o;return json({order:safe,unchanged:true,alreadyApplied:true});}
  if(!next&&typeof body.paymentReceived==='boolean'&&body.paymentReceived===o.paymentReceived){const {customerToken,...safe}=o;return json({order:safe,unchanged:true,alreadyApplied:true});}
