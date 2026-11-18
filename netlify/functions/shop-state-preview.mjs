@@ -2,10 +2,9 @@ import {verifyStaffSession} from './nebu-staff-session.mjs';
 // Read-only preview of the public NEBU shop settings. Never writes to production.
 export default async function handler(req) {
   if (req.method !== 'GET') return Response.json({error:'Methode nicht erlaubt'},{status:405});
-  const key=Netlify.env.get('NEBU_TEST_ADMIN_KEY');
   const bearer=req.headers.get('authorization')||'';
   const validSession=bearer.startsWith('Bearer ')&&await verifyStaffSession(bearer.slice(7),Netlify.env.get('NEBU_TEST_SESSION_SECRET'));
-  if (!validSession && !(key&&req.headers.get('x-nebu-test-key')===key)) return Response.json({error:'Nur für NEBU-Mitarbeiter'},{status:403});
+  if (!validSession) return Response.json({error:'Nur für NEBU-Mitarbeiter'},{status:403});
   try {
     const response=await fetch('https://shop.nebusushi.com/api/menu-state',{signal:AbortSignal.timeout(7000),headers:{accept:'application/json'},redirect:'error'});
     if (!response.ok) throw Error('Shop antwortet mit HTTP '+response.status);
