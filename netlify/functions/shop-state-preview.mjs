@@ -12,7 +12,7 @@ export default async function handler(req) {
     const status=['auto','open','closed'].includes(data.statusMode)?data.statusMode:'auto';
     const prepTime=typeof data.prepTime==='string'?data.prepTime.slice(0,80):'';
     const soldOut=Array.isArray(data.soldOut)?data.soldOut.filter(v=>typeof v==='string').slice(0,200):[];
-    return Response.json({source:'shop.nebusushi.com',mode:'read-only',statusMode:status,prepTime,soldOut},{headers:{'cache-control':'no-store'}});
+    return Response.json({source:'shop.nebusushi.com',mode:'read-only',statusMode:status,prepTime,soldOut},{headers:{'cache-control':'no-store, private','pragma':'no-cache','x-content-type-options':'nosniff','referrer-policy':'no-referrer'}});
   } catch(error) {
     return Response.json({error:'Shop-Einstellungen derzeit nicht erreichbar: '+error.message},{status:502,headers:{'cache-control':'no-store'}});
   }
