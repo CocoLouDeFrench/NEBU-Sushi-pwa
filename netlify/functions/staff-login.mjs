@@ -1,6 +1,6 @@
 import {getStore} from '@netlify/blobs';
 import {issueStaffSession} from './nebu-staff-session.mjs';
-const reply=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store','pragma':'no-cache'}});
+const reply=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store, private','pragma':'no-cache','x-content-type-options':'nosniff','referrer-policy':'no-referrer'}});
 const digest=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))).map(x=>x.toString(16).padStart(2,'0')).join('');
 export default async req=>{
  if(req.method!=='POST')return reply({error:'Methode nicht erlaubt'},405);
