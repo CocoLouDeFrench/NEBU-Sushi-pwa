@@ -27,6 +27,12 @@ export default async req=>{
   if(['update','inventory-update'].includes(body.action)&&!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);
   if(!['create','status','inventory','inventory-update','update'].includes(body.action))return json({error:'Ungültige Aktion'},400);
   if(body.action==='status'&&(typeof body.id!=='string'||body.id.length>80||typeof body.token!=='string'||body.token.length>160))return json({error:'Ungültige Statusanfrage'},400);
+  if(body.action==='update'){
+   const allowed=new Set(['action','id','expectedVersion','status','eta','riskReviewed','cancelReason','paymentReceived']);
+   if(Object.keys(body).some(key=>!allowed.has(key)))return json({error:'Nicht erlaubte Bestelländerung'},422);
+   if(typeof body.id!=='string'||body.id.length>80||!Number.isInteger(body.expectedVersion)||body.expectedVersion<0)return json({error:'Ungültige Bestellversion'},422);
+   if(body.status!==undefined&&typeof body.status!=='string')return json({error:'Ungültiger Bestellstatus'},422);
+  }
  }
  const db=getDatabase();let client=null;
  try{
