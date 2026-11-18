@@ -5,7 +5,7 @@ import {getDatabase} from '@netlify/database';
 import webpush from 'web-push';
 import {verifyStaffSession} from './nebu-staff-session.mjs';
 function validatePhone(value){const phone=String(value||'').trim();if(!/^\+?[0-9\s()\/-]+$/.test(phone))return 'Bitte nur Ziffern und übliche Telefonnummern-Zeichen eingeben.';const digits=phone.replace(/\D/g,'');if(digits.length<7||digits.length>15)return 'Bitte eine Telefonnummer mit 7 bis 15 Ziffern eingeben.';if(/^(\d)\1{6,}$/.test(digits)||/^(?:0123456789|1234567890|9876543210|0987654321)/.test(digits))return 'Diese Telefonnummer wirkt ungültig. Bitte überprüfe sie.';if(phone.startsWith('+')&&digits.startsWith('00'))return 'Bitte die Landesvorwahl nur einmal angeben.';if(digits.startsWith('49')){const local=digits.slice(2).replace(/^0/,'');if(!/^1[567]\d{8,9}$/.test(local)&&!/^\d{3,13}$/.test(local))return 'Bitte die deutsche Telefonnummer überprüfen.';}else if(digits.startsWith('0')&&!digits.startsWith('00')){if(!/^01[567]\d{8,9}$/.test(digits)&&!/^0[2-9]\d{5,13}$/.test(digits))return 'Bitte die deutsche Telefonnummer überprüfen.';}return ''};
-const json=(x,s=200)=>Response.json(x,{status:s,headers:{'cache-control':'no-store'}});
+const json=(x,s=200)=>Response.json(x,{status:s,headers:{'cache-control':'no-store, private','pragma':'no-cache','x-content-type-options':'nosniff','referrer-policy':'no-referrer'}});
 export default async req=>{
  const customerKey=Netlify.env.get('NEBU_TEST_CUSTOMER_KEY');
  const sessionSecret=Netlify.env.get('NEBU_TEST_SESSION_SECRET');
