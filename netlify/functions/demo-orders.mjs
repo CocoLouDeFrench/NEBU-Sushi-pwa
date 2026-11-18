@@ -99,7 +99,7 @@ const transitions={new:['accepted','rejected'],accepted:['preparing'],preparing:
  if(next==='delivery_failed'&&o.paymentReceived===true)return json({error:'Zahlung bereits bestätigt. Zustellung fehlgeschlagen kann nicht gewählt werden.'},409);
  if((next==='delivered'||next==='picked_up')&&o.paymentMethod==='cash'&&o.paymentReceived!==true)return json({error:'Barzahlung noch offen: Bitte Zahlungseingang bestätigen, bevor du die Bestellung abschließt.'},409);
  if(next==='accepted'&&o.riskFlag?.level==='review'&&body.riskReviewed!==true)return json({error:'Auffälliges Bestellmuster: Bitte Bestellung prüfen und die Annahme ausdrücklich bestätigen.'},409);
- if(next){if(next==='accepted'){const eta=Number(body.eta);if(![30,45,60,75].includes(eta))return json({error:'Ungültige Lieferzeit'},400);o.eta=eta;o.acceptedAt=new Date().toISOString();o.deliveryDueAt=new Date(Date.parse(o.acceptedAt)+eta*60000).toISOString()}o.status=next}
+ if(next==='rejected'){const reason=String(body.cancelReason||'').trim();if(!reason||reason.length>300)return json({error:'Bitte einen Ablehnungsgrund mit maximal 300 Zeichen angeben.'},422);o.cancelReason=reason;o.cancelledAt=new Date().toISOString();}if(next){if(next==='accepted'){const eta=Number(body.eta);if(![30,45,60,75].includes(eta))return json({error:'Ungültige Lieferzeit'},400);o.eta=eta;o.acceptedAt=new Date().toISOString();o.deliveryDueAt=new Date(Date.parse(o.acceptedAt)+eta*60000).toISOString()}o.status=next}
  if(typeof body.paymentReceived==='boolean'){
   if(['rejected','delivery_failed'].includes(o.status))return json({error:'Bei abgelehnten oder gescheiterten Bestellungen kann keine Zahlung bestätigt werden.'},409);
   o.paymentReceived=body.paymentReceived;
