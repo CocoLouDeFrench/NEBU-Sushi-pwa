@@ -12,7 +12,8 @@ export default async req=>{
  const bearer=req.headers.get('authorization')||'';
  const sessionValid=bearer.startsWith('Bearer ')?await verifyStaffSession(bearer.slice(7),sessionSecret):false;
  const isAdmin=Boolean(sessionValid);
- const isCustomer=Boolean(customerKey&&suppliedKey===customerKey&&customerKey!==adminKey);
+ const suppliedKey=req.headers.get('x-nebu-test-key');
+ const isCustomer=Boolean(customerKey&&suppliedKey===customerKey);
  // Reject unauthorized requests before opening a database transaction.
  if(req.method==='GET'&&!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);
  if(!['GET','POST'].includes(req.method))return json({error:'Methode nicht erlaubt'},405);
