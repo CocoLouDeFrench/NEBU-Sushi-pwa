@@ -11,6 +11,19 @@ export default async req=>{
  const suppliedKey=req.headers.get('x-nebu-test-key');
  const isAdmin=Boolean(adminKey&&suppliedKey===adminKey);
  const isCustomer=Boolean(customerKey&&suppliedKey===customerKey&&customerKey!==adminKey);
+ // Reject unauthorized requests before opening a database transaction.
+ if(req.method==='GET'&&!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);
+ if(!['GET','POST'].includes(req.method))return json({error:'Methode nicht erlaubt'},405);
+ const declaredLength=Number(req.headers.get('content-length')||0);
+ if(req.method==='POST'&&declaredLength>32768)return json({error:'Anfrage zu groß'},413);
+ let body=null;
+ if(req.method==='POST'){
+  try{const raw=await req.text();if(raw.length>32768)return json({error:'Anfrage zu groß'},413);body=JSON.parse(raw)}
+  catch{return json({error:'Ungültige JSON-Anfrage'},400)}
+  if(!body||typeof body!=='object'||Array.isArray(body))return json({error:'Ungültige Anfrage'},400);
+  if(['update','inventory-update'].includes(body.action)&&!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);
+  if(!['create','status','inventory','inventory-update','update'].includes(body.action))return json({error:'Ungültige Aktion'},400);
+ }
  const db=getDatabase();let client=null;
  try{
  // A row-level PostgreSQL lock makes every write to the test queue serial.
@@ -34,7 +47,6 @@ export default async req=>{
  };
  if(req.method==='GET'){if(!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);return json({orders:orders.map(({customerToken,...order})=>order)});}
  if(req.method!=='POST')return json({error:'Methode nicht erlaubt'},405);
- const body=await req.json();
  const inventoryStore=getStore('nebu-test-inventory');
  if(body.action==='inventory'){const disabled=await inventoryStore.get('disabled',{type:'json'})||[];return json({disabled:Array.isArray(disabled)?disabled:[]});}
  if(body.action==='inventory-update'){
