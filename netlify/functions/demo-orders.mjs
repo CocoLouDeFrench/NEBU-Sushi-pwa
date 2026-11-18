@@ -26,6 +26,7 @@ export default async req=>{
   if(!body||typeof body!=='object'||Array.isArray(body))return json({error:'Ungültige Anfrage'},400);
   if(['update','inventory-update'].includes(body.action)&&!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);
   if(!['create','status','inventory','inventory-update','update'].includes(body.action))return json({error:'Ungültige Aktion'},400);
+  if(body.action==='status'&&(typeof body.id!=='string'||body.id.length>80||typeof body.token!=='string'||body.token.length>160))return json({error:'Ungültige Statusanfrage'},400);
  }
  const db=getDatabase();let client=null;
  try{
