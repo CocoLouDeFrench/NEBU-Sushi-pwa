@@ -56,7 +56,7 @@ export default async req=>{
   await client.query('COMMIT');client.release();client=null;
   return true;
  };
- if(req.method==='GET'){if(!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);return json({orders:orders.map(({customerToken,...order})=>order)});}
+ if(req.method==='GET'){if(!isAdmin)return json({error:'Nur für NEBU-Mitarbeiter'},403);let printAgent=null;try{printAgent=await getStore('nebu-print-agent').get('heartbeat',{type:'json'})}catch{}return json({orders:orders.map(({customerToken,...order})=>order),printAgent});}
  if(req.method!=='POST')return json({error:'Methode nicht erlaubt'},405);
  const inventoryStore=getStore('nebu-test-inventory');
  if(body.action==='inventory'){const disabled=await inventoryStore.get('disabled',{type:'json'})||[];return json({disabled:Array.isArray(disabled)?disabled:[]});}
@@ -66,7 +66,7 @@ export default async req=>{
   if(!Array.isArray(ids)||ids.length>100||ids.some(id=>typeof id!=='string'||!lookup.has(id)))return json({error:'Ungültige Artikelliste'},422);
   await inventoryStore.setJSON('disabled',[...new Set(ids)]);return json({disabled:[...new Set(ids)]});
  }
- if(body.action==='status'){const order=orders.find(o=>o.id===body.id);if(!order||!body.token||body.token!==order.customerToken)return json({error:'Bestellung nicht gefunden oder Zugriff verweigert'},403);const {customerToken,customer,email,phone,address,bell,floor,notes,riskFlag,paymentHistory,paymentReversed,...safe}=order;return json({order:safe});}
+ if(body.action==='status'){const order=orders.find(o=>o.id===body.id);if(!order||!body.token||body.token!==order.customerToken)return json({error:'Bestellung nicht gefunden oder Zugriff verweigert'},403);const {customerToken,customer,email,phone,address,bell,floor,notes,riskFlag,paymentHistory,paymentReversed,kitchenPrint,...safe}=order;return json({order:safe});}
  if(body.action==='create'){
  if(!isCustomer){
   const ip=req.headers.get('x-nf-client-connection-ip');
@@ -134,7 +134,7 @@ const transitions={new:['accepted','rejected'],accepted:['preparing'],preparing:
  if(next==='delivery_failed'&&o.paymentReceived===true)return json({error:'Zahlung bereits bestätigt. Zustellung fehlgeschlagen kann nicht gewählt werden.'},409);
  if((next==='delivered'||next==='picked_up')&&o.paymentMethod==='cash'&&o.paymentReceived!==true)return json({error:'Barzahlung noch offen: Bitte Zahlungseingang bestätigen, bevor du die Bestellung abschließt.'},409);
  if(next==='accepted'&&o.riskFlag?.level==='review'&&body.riskReviewed!==true)return json({error:'Auffälliges Bestellmuster: Bitte Bestellung prüfen und die Annahme ausdrücklich bestätigen.'},409);
- if(next==='rejected'){const reason=String(body.cancelReason||'').trim();if(!reason||reason.length>300)return json({error:'Bitte einen Ablehnungsgrund mit maximal 300 Zeichen angeben.'},422);o.cancelReason=reason;o.cancelledAt=new Date().toISOString();}if(next){if(next==='accepted'){const eta=Number(body.eta);if(![30,45,60,75].includes(eta))return json({error:'Ungültige Lieferzeit'},400);o.eta=eta;o.acceptedAt=new Date().toISOString();o.deliveryDueAt=new Date(Date.parse(o.acceptedAt)+eta*60000).toISOString()}o.status=next}
+ if(next==='rejected'){const reason=String(body.cancelReason||'').trim();if(!reason||reason.length>300)return json({error:'Bitte einen Ablehnungsgrund mit maximal 300 Zeichen angeben.'},422);o.cancelReason=reason;o.cancelledAt=new Date().toISOString();}if(next){if(next==='accepted'){const eta=Number(body.eta);if(![30,45,60,75].includes(eta))return json({error:'Ungültige Lieferzeit'},400);o.eta=eta;o.acceptedAt=new Date().toISOString();o.deliveryDueAt=new Date(Date.parse(o.acceptedAt)+eta*60000).toISOString();if(!o.kitchenPrint)o.kitchenPrint={jobId:crypto.randomUUID(),status:'queued',queuedAt:o.acceptedAt,attempts:0}}o.status=next}
  if(typeof body.paymentReceived==='boolean'&&body.paymentReceived!==o.paymentReceived){
   if(['rejected','delivery_failed'].includes(o.status))return json({error:'Bei abgelehnten oder gescheiterten Bestellungen kann keine Zahlung bestätigt werden.'},409);
   // Payment rules (test branch): append-only log, confirm only after acceptance, reversal only with a reason.

@@ -1,0 +1,7 @@
+{
+  "name": "nebu-print-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "NEBU Control – automatischer Küchendruck (Epson TM-T20III, 80 mm). Keine Abhängigkeiten."
+}
