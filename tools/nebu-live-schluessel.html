@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEBU – Live-Schlüssel erzeugen</title>
+<style>
+body{font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:760px;margin:24px auto;padding:0 16px;color:#17212b;background:#fafafa}
+h1{font-size:22px}code,textarea{font:13px ui-monospace,Consolas,monospace}
+.row{background:white;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin:12px 0}
+.row b{display:block}textarea{width:100%;box-sizing:border-box;height:46px;margin:6px 0;resize:none}
+button{padding:8px 14px;border-radius:8px;border:1px solid #123e54;background:#123e54;color:white;cursor:pointer}
+.warn{background:#fff4e5;border:1px solid #f0c27b;border-radius:10px;padding:10px 14px}
+small{color:#555}
+</style>
+</head>
+<body>
+<h1>NEBU – Schlüssel für die Live-Umgebung</h1>
+<p class="warn">Diese Seite läuft nur in deinem Browser und sendet nichts ins Internet. Die Werte erscheinen nur hier. Trage sie in Netlify ein: <b>Projekt shop.nebusushi.com → Project configuration → Environment variables</b> (bei Schlüsseln „Contains secret values“ anhaken). Danach diese Seite schließen. Für Test und Live <b>immer unterschiedliche</b> Werte verwenden.</p>
+<div id="out"></div>
+<p><button id="again" type="button">Neue Werte erzeugen</button></p>
+<p><small>Den Schlüssel für den Druckdienst (<code>NEBU_PRINT_AGENT_TOKEN</code>) erzeugt das Live-Installationsskript direkt auf dem Restaurant-PC.</small></p>
+<script>
+(()=>{
+const b64u=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const rand=n=>crypto.getRandomValues(new Uint8Array(n));
+const words=n=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';return [...rand(n)].map(b=>a[b%32]).join('').match(/.{1,4}/g).join('-')};
+async function make(){
+ const pair=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+ const pub=new Uint8Array(await crypto.subtle.exportKey('raw',pair.publicKey));
+ const priv=(await crypto.subtle.exportKey('jwk',pair.privateKey)).d;
+ const rows=[
+  ['NEBU_ENV','live','kein Geheimnis'],
+  ['NEBU_SESSION_SECRET',b64u(rand(48)),'geheim – signiert Mitarbeiter-Anmeldungen'],
+  ['NEBU_OWNER_SETUP_CODE',words(24),'geheim – nur für die einmalige Ersteinrichtung des Inhaber-Zugangs, danach in Netlify löschen'],
+  ['NEBU_VAPID_PUBLIC',b64u(pub),'öffentlich – für Push-Benachrichtigungen'],
+  ['NEBU_VAPID_PRIVATE',priv,'geheim – für Push-Benachrichtigungen'],
+  ['NEBU_VAPID_CONTACT','mailto:info@nebusushi.com','Kontaktadresse für Push-Dienste (bei Bedarf anpassen)']
+ ];
+ const out=document.getElementById('out');out.replaceChildren();
+ for(const [key,value,hint] of rows){
+  const row=document.createElement('div');row.className='row';
+  const b=document.createElement('b');b.textContent=key;
+  const t=document.createElement('textarea');t.readOnly=true;t.value=value;
+  const btn=document.createElement('button');btn.type='button';btn.textContent='Wert kopieren';
+  btn.onclick=async()=>{try{await navigator.clipboard.writeText(value);btn.textContent='Kopiert ✓'}catch{t.select();document.execCommand('copy');btn.textContent='Kopiert ✓'}setTimeout(()=>btn.textContent='Wert kopieren',1500)};
+  const s=document.createElement('small');s.textContent=hint;
+  row.append(b,t,btn,document.createElement('br'),s);out.append(row);
+ }
+}
+document.getElementById('again').onclick=make;make();
+})();
+</script>
+</body>
+</html>

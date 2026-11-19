@@ -1,0 +1,1 @@
+export default async () => Response.json({publicKey:Netlify.env.get('NEBU_VAPID_PUBLIC')||null,configured:!!Netlify.env.get('NEBU_VAPID_PRIVATE')},{headers:{'cache-control':'no-store'}});

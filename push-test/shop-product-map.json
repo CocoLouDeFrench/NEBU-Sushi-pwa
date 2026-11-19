@@ -1,0 +1,463 @@
+{
+  "version": 1,
+  "source": "production menu in main/index.html",
+  "generatedFor": "test/iphone-push-bestellcenter",
+  "products": [
+    {
+      "testId": "p001",
+      "shopKey": "Vorspeisen||Miso Shiru (vegan)",
+      "name": "Miso Shiru (vegan)",
+      "category": "Vorspeisen"
+    },
+    {
+      "testId": "p002",
+      "shopKey": "Vorspeisen||Miso Shiru Sake",
+      "name": "Miso Shiru Sake",
+      "category": "Vorspeisen"
+    },
+    {
+      "testId": "p003",
+      "shopKey": "Vorspeisen||Edamame",
+      "name": "Edamame",
+      "category": "Vorspeisen"
+    },
+    {
+      "testId": "p004",
+      "shopKey": "Vorspeisen||Kimchi",
+      "name": "Kimchi",
+      "category": "Vorspeisen"
+    },
+    {
+      "testId": "p005",
+      "shopKey": "Vorspeisen||Goma Wakame (vegan)",
+      "name": "Goma Wakame (vegan)",
+      "category": "Vorspeisen"
+    },
+    {
+      "testId": "p006",
+      "shopKey": "Vorspeisen||Tori Gyoza (4 Stück)",
+      "name": "Tori Gyoza (4 Stück)",
+      "category": "Vorspeisen"
+    },
+    {
+      "testId": "p007",
+      "shopKey": "Vorspeisen||Yasai Gyoza (4 Stück)",
+      "name": "Yasai Gyoza (4 Stück)",
+      "category": "Vorspeisen"
+    },
+    {
+      "testId": "p008",
+      "shopKey": "Bowls||Sake Bowl",
+      "name": "Sake Bowl",
+      "category": "Bowls"
+    },
+    {
+      "testId": "p009",
+      "shopKey": "Bowls||Yasai Bowl",
+      "name": "Yasai Bowl",
+      "category": "Bowls"
+    },
+    {
+      "testId": "p010",
+      "shopKey": "Bowls||Grill Salmon Bowl (scharf)",
+      "name": "Grill Salmon Bowl (scharf)",
+      "category": "Bowls"
+    },
+    {
+      "testId": "p011",
+      "shopKey": "Sashimi||Avocado Sashimi",
+      "name": "Avocado Sashimi",
+      "category": "Sashimi"
+    },
+    {
+      "testId": "p012",
+      "shopKey": "Sashimi||Sake Sashimi (6 Stück)",
+      "name": "Sake Sashimi (6 Stück)",
+      "category": "Sashimi"
+    },
+    {
+      "testId": "p013",
+      "shopKey": "Sashimi||Maguro Sashimi (6 Stück)",
+      "name": "Maguro Sashimi (6 Stück)",
+      "category": "Sashimi"
+    },
+    {
+      "testId": "p014",
+      "shopKey": "Maki||Sake Avocado Maki",
+      "name": "Sake Avocado Maki",
+      "category": "Maki"
+    },
+    {
+      "testId": "p015",
+      "shopKey": "Maki||Sake Maki",
+      "name": "Sake Maki",
+      "category": "Maki"
+    },
+    {
+      "testId": "p016",
+      "shopKey": "Maki||Sake Tatar Maki (scharf)",
+      "name": "Sake Tatar Maki (scharf)",
+      "category": "Maki"
+    },
+    {
+      "testId": "p017",
+      "shopKey": "Maki||Maguro Maki",
+      "name": "Maguro Maki",
+      "category": "Maki"
+    },
+    {
+      "testId": "p018",
+      "shopKey": "Maki||Maguro Tatar Maki (scharf)",
+      "name": "Maguro Tatar Maki (scharf)",
+      "category": "Maki"
+    },
+    {
+      "testId": "p019",
+      "shopKey": "Maki||Maguro Kappa Maki",
+      "name": "Maguro Kappa Maki",
+      "category": "Maki"
+    },
+    {
+      "testId": "p020",
+      "shopKey": "Maki||Kani Maki",
+      "name": "Kani Maki",
+      "category": "Maki"
+    },
+    {
+      "testId": "p021",
+      "shopKey": "Maki||Kani Avocado Maki",
+      "name": "Kani Avocado Maki",
+      "category": "Maki"
+    },
+    {
+      "testId": "p022",
+      "shopKey": "Maki||Ebi Maki",
+      "name": "Ebi Maki",
+      "category": "Maki"
+    },
+    {
+      "testId": "p023",
+      "shopKey": "Maki||Ebi Avocado Maki",
+      "name": "Ebi Avocado Maki",
+      "category": "Maki"
+    },
+    {
+      "testId": "p024",
+      "shopKey": "Maki||Tamago Maki",
+      "name": "Tamago Maki",
+      "category": "Maki"
+    },
+    {
+      "testId": "p025",
+      "shopKey": "Maki||Ninjin Maki",
+      "name": "Ninjin Maki",
+      "category": "Maki"
+    },
+    {
+      "testId": "p026",
+      "shopKey": "Maki||Kappa Maki",
+      "name": "Kappa Maki",
+      "category": "Maki"
+    },
+    {
+      "testId": "p027",
+      "shopKey": "Maki||Avocado Maki",
+      "name": "Avocado Maki",
+      "category": "Maki"
+    },
+    {
+      "testId": "p028",
+      "shopKey": "Maki||Avocado Cream Maki",
+      "name": "Avocado Cream Maki",
+      "category": "Maki"
+    },
+    {
+      "testId": "p029",
+      "shopKey": "Maki||Kampyo Maki",
+      "name": "Kampyo Maki",
+      "category": "Maki"
+    },
+    {
+      "testId": "p030",
+      "shopKey": "Maki||Oshinko Maki",
+      "name": "Oshinko Maki",
+      "category": "Maki"
+    },
+    {
+      "testId": "p031",
+      "shopKey": "Nigiri||Maguro Nigiri",
+      "name": "Maguro Nigiri",
+      "category": "Nigiri"
+    },
+    {
+      "testId": "p032",
+      "shopKey": "Nigiri||Sake Nigiri",
+      "name": "Sake Nigiri",
+      "category": "Nigiri"
+    },
+    {
+      "testId": "p033",
+      "shopKey": "Nigiri||Sake Aburi Nigiri",
+      "name": "Sake Aburi Nigiri",
+      "category": "Nigiri"
+    },
+    {
+      "testId": "p034",
+      "shopKey": "Nigiri||Ebi Nigiri",
+      "name": "Ebi Nigiri",
+      "category": "Nigiri"
+    },
+    {
+      "testId": "p035",
+      "shopKey": "Nigiri||Kani Nigiri",
+      "name": "Kani Nigiri",
+      "category": "Nigiri"
+    },
+    {
+      "testId": "p036",
+      "shopKey": "Nigiri||Tamago Nigiri",
+      "name": "Tamago Nigiri",
+      "category": "Nigiri"
+    },
+    {
+      "testId": "p037",
+      "shopKey": "Nigiri||Avocado Nigiri",
+      "name": "Avocado Nigiri",
+      "category": "Nigiri"
+    },
+    {
+      "testId": "p038",
+      "shopKey": "Nigiri||Sake Tatar Gunkan (scharf)",
+      "name": "Sake Tatar Gunkan (scharf)",
+      "category": "Nigiri"
+    },
+    {
+      "testId": "p039",
+      "shopKey": "Nigiri||Tekka Tatar Gunkan (scharf)",
+      "name": "Tekka Tatar Gunkan (scharf)",
+      "category": "Nigiri"
+    },
+    {
+      "testId": "p040",
+      "shopKey": "Nigiri||Inari Nigiri",
+      "name": "Inari Nigiri",
+      "category": "Nigiri"
+    },
+    {
+      "testId": "p041",
+      "shopKey": "Inside Out||California Roll",
+      "name": "California Roll",
+      "category": "Inside Out"
+    },
+    {
+      "testId": "p042",
+      "shopKey": "Inside Out||Sake Roll",
+      "name": "Sake Roll",
+      "category": "Inside Out"
+    },
+    {
+      "testId": "p043",
+      "shopKey": "Inside Out||Sake Cream Roll",
+      "name": "Sake Cream Roll",
+      "category": "Inside Out"
+    },
+    {
+      "testId": "p044",
+      "shopKey": "Inside Out||Maguro Roll",
+      "name": "Maguro Roll",
+      "category": "Inside Out"
+    },
+    {
+      "testId": "p045",
+      "shopKey": "Inside Out||Ebi Roll (scharf)",
+      "name": "Ebi Roll (scharf)",
+      "category": "Inside Out"
+    },
+    {
+      "testId": "p046",
+      "shopKey": "Inside Out||Tamago Roll",
+      "name": "Tamago Roll",
+      "category": "Inside Out"
+    },
+    {
+      "testId": "p047",
+      "shopKey": "Inside Out||Vegan Roll",
+      "name": "Vegan Roll",
+      "category": "Inside Out"
+    },
+    {
+      "testId": "p048",
+      "shopKey": "Inside Out||Veggie Roll",
+      "name": "Veggie Roll",
+      "category": "Inside Out"
+    },
+    {
+      "testId": "p049",
+      "shopKey": "Special Rolls||Hot Spicy Salmon (scharf)",
+      "name": "Hot Spicy Salmon (scharf)",
+      "category": "Special Rolls"
+    },
+    {
+      "testId": "p050",
+      "shopKey": "Special Rolls||Hot Spicy Tuna (scharf)",
+      "name": "Hot Spicy Tuna (scharf)",
+      "category": "Special Rolls"
+    },
+    {
+      "testId": "p051",
+      "shopKey": "Special Rolls||Green Dragon",
+      "name": "Green Dragon",
+      "category": "Special Rolls"
+    },
+    {
+      "testId": "p052",
+      "shopKey": "Special Rolls||Red Dragon",
+      "name": "Red Dragon",
+      "category": "Special Rolls"
+    },
+    {
+      "testId": "p053",
+      "shopKey": "Special Rolls||Rainbow",
+      "name": "Rainbow",
+      "category": "Special Rolls"
+    },
+    {
+      "testId": "p054",
+      "shopKey": "Special Rolls||Salmon on Fire",
+      "name": "Salmon on Fire",
+      "category": "Special Rolls"
+    },
+    {
+      "testId": "p055",
+      "shopKey": "Special Rolls||Veggie Dream",
+      "name": "Veggie Dream",
+      "category": "Special Rolls"
+    },
+    {
+      "testId": "p056",
+      "shopKey": "Mixbox Mini||Maki Box",
+      "name": "Maki Box",
+      "category": "Mixbox Mini"
+    },
+    {
+      "testId": "p057",
+      "shopKey": "Mixbox Mini||Vegan Box S",
+      "name": "Vegan Box S",
+      "category": "Mixbox Mini"
+    },
+    {
+      "testId": "p058",
+      "shopKey": "Mixbox Mini||Tuna Box",
+      "name": "Tuna Box",
+      "category": "Mixbox Mini"
+    },
+    {
+      "testId": "p059",
+      "shopKey": "Mix Box||Nebu Spezial Box",
+      "name": "Nebu Spezial Box",
+      "category": "Mix Box"
+    },
+    {
+      "testId": "p060",
+      "shopKey": "Mix Box||Der Klassiker",
+      "name": "Der Klassiker",
+      "category": "Mix Box"
+    },
+    {
+      "testId": "p061",
+      "shopKey": "Mix Box||Sake Box",
+      "name": "Sake Box",
+      "category": "Mix Box"
+    },
+    {
+      "testId": "p062",
+      "shopKey": "Mix Box||Veggie Box",
+      "name": "Veggie Box",
+      "category": "Mix Box"
+    },
+    {
+      "testId": "p063",
+      "shopKey": "Mix Box||Vegan Box M",
+      "name": "Vegan Box M",
+      "category": "Mix Box"
+    },
+    {
+      "testId": "p064",
+      "shopKey": "Mix Box||Nigiri Box",
+      "name": "Nigiri Box",
+      "category": "Mix Box"
+    },
+    {
+      "testId": "p065",
+      "shopKey": "Extras||Sesamsauce",
+      "name": "Sesamsauce",
+      "category": "Extras"
+    },
+    {
+      "testId": "p066",
+      "shopKey": "Extras||Ingwer",
+      "name": "Ingwer",
+      "category": "Extras"
+    },
+    {
+      "testId": "p067",
+      "shopKey": "Extras||Spicy Mayonnaise",
+      "name": "Spicy Mayonnaise",
+      "category": "Extras"
+    },
+    {
+      "testId": "p068",
+      "shopKey": "Extras||Japanische Mayonnaise",
+      "name": "Japanische Mayonnaise",
+      "category": "Extras"
+    },
+    {
+      "testId": "p069",
+      "shopKey": "Extras||Wasabi",
+      "name": "Wasabi",
+      "category": "Extras"
+    },
+    {
+      "testId": "p070",
+      "shopKey": "Extras||Wasabi Citrus",
+      "name": "Wasabi Citrus",
+      "category": "Extras"
+    },
+    {
+      "testId": "p071",
+      "shopKey": "Extras||Teriyaki Sauce",
+      "name": "Teriyaki Sauce",
+      "category": "Extras"
+    },
+    {
+      "testId": "p072",
+      "shopKey": "Extras||Sojasauce",
+      "name": "Sojasauce",
+      "category": "Extras"
+    },
+    {
+      "testId": "p073",
+      "shopKey": "Extras||Sushi Reis",
+      "name": "Sushi Reis",
+      "category": "Extras"
+    },
+    {
+      "testId": "p074",
+      "shopKey": "Extras||Stäbchen",
+      "name": "Stäbchen",
+      "category": "Extras"
+    },
+    {
+      "testId": "p075",
+      "shopKey": "Getränke||Coca-Cola 0,33l (Mehrweg)",
+      "name": "Coca-Cola 0,33l (Mehrweg)",
+      "category": "Getränke"
+    },
+    {
+      "testId": "p076",
+      "shopKey": "Getränke||Coca-Cola Zero Sugar 0,33l (Mehrweg)",
+      "name": "Coca-Cola Zero Sugar 0,33l (Mehrweg)",
+      "category": "Getränke"
+    }
+  ]
+}

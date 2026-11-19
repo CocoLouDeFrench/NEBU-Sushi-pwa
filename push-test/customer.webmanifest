@@ -1,0 +1,18 @@
+{
+  "name": "NEBU Kunden-Test",
+  "short_name": "NEBU Kunde",
+  "id": "./customer.html",
+  "start_url": "./customer.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101010",
+  "theme_color": "#101010",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
