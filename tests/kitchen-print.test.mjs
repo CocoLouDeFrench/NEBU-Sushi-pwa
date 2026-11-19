@@ -98,3 +98,15 @@ test('unconfirmed print is not handed out again and not shown as printed',async(
  order('T1').kitchenPrint.leaseUntil=new Date(Date.now()-1).toISOString();
  assert.equal((await read(await agent({action:'claim'}))).jobs.length,0,'kein automatischer Neudruck');
 });
+
+test('printer not ready: job stays stored and is not handed out; on recovery it is handed out immediately',async()=>{
+ set(base());await accept('T1');
+ const down=await read(await agent({action:'claim',printer:{ok:false,detail:'Deckel offen'}}));
+ assert.equal(down.jobs.length,0);assert.equal(down.waiting,1);
+ assert.equal(order('T1').kitchenPrint.status,'queued');assert.equal(order('T1').kitchenPrint.attempts,0);
+ // Früherer Fehlversuch mit langer Wartezeit wird bei retryNow übersprungen.
+ order('T1').kitchenPrint.nextAttemptAt=new Date(Date.now()+60000).toISOString();
+ assert.equal((await read(await agent({action:'claim',printer:{ok:true}}))).jobs.length,0);
+ const up=await read(await agent({action:'claim',printer:{ok:true},retryNow:true}));
+ assert.equal(up.jobs.length,1);
+});

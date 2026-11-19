@@ -14,7 +14,7 @@ import {execFile} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {renderTicket,renderTestPage,STATUS_QUERIES,interpretStatus} from './escpos.mjs';
 
-export const VERSION='1.1.0';
+export const VERSION='1.2.0';
 const HERE=path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR=process.env.NEBU_PRINT_DATA||(process.platform==='win32'?path.join(process.env.ProgramData||'C:\\ProgramData','NEBU-Druckdienst'):path.join(os.homedir(),'.nebu-druckdienst'));
 const CONFIG_PATH=process.env.NEBU_PRINT_CONFIG||path.join(DATA_DIR,'config.json');
@@ -214,9 +214,13 @@ export async function cycle(cfg,journal,deps={}){
  // 2) Neue Aufträge abholen. Den Drucker nur alle 30 s für die Statusanzeige ansprechen (weniger
  //    Verbindungen auf Port 9100) – und immer frisch, sobald tatsächlich ein Auftrag da ist.
  const st=deps.state||cycleState;
+ // Ist der Drucker nicht bereit, wird er jede Runde neu geprüft, damit es nach dem Beheben sofort weitergeht.
  let fresh=false;
- if(!st.printer||Date.now()-st.printerAt>=STATUS_INTERVAL_MS){st.printer=await status(cfg.printer);st.printerAt=Date.now();fresh=true}
- const {jobs=[]}=await apiCall(cfg,{action:'claim',printer:st.printer});
+ if(!st.printer||!st.printer.ok||Date.now()-st.printerAt>=STATUS_INTERVAL_MS){st.printer=await status(cfg.printer);st.printerAt=Date.now();fresh=true}
+ const retryNow=st.printer.ok&&st.hadProblem===true;
+ const {jobs=[],waiting=0}=await apiCall(cfg,{action:'claim',printer:st.printer,retryNow});
+ st.hadProblem=!st.printer.ok?true:(retryNow?false:st.hadProblem);
+ if(retryNow)log('INFO','Drucker wieder bereit – wartende Küchenbons werden sofort gedruckt');
  if(jobs.length&&!fresh){st.printer=await status(cfg.printer);st.printerAt=Date.now()}
  const printer=st.printer;
  const result={printer,printed:0,failed:0,unconfirmed:0,deduplicated:0};

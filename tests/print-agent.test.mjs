@@ -171,3 +171,16 @@ test('unconfirmed print is reported as unconfirmed (not printed) and never re-se
  await cycle({},j,{apiCall:srv.call,status:okPrinter,send});
  assert.equal(prints,1,'kein zweiter Druck');
 });
+
+test('after printer recovery the agent asks for waiting jobs immediately (retryNow)',async()=>{
+ const j=new Journal(path.join(dir,'j6.json'));const calls=[];const state={};
+ const api=async(c,b)=>{calls.push(b);return {jobs:[]}};
+ let ok=false;const st=async()=>({ok,detail:ok?'bereit':'Deckel offen'});
+ await cycle({},j,{apiCall:api,status:st,send:async()=>({confirmed:true}),state});
+ assert.equal(calls.at(-1).printer.ok,false);
+ ok=true;
+ await cycle({},j,{apiCall:api,status:st,send:async()=>({confirmed:true}),state});
+ assert.equal(calls.at(-1).retryNow,true,'sofort nach dem Schließen');
+ await cycle({},j,{apiCall:api,status:st,send:async()=>({confirmed:true}),state});
+ assert.equal(calls.at(-1).retryNow,false);
+});

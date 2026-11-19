@@ -58,21 +58,25 @@ export default async req=>{
   let changed=false;const out={};
 
   if(body.action==='claim'){
-   const jobs=[];
+   const jobs=[];let waiting=0;const printerReady=body.printer&&typeof body.printer.ok==='boolean'?body.printer.ok:undefined;
    for(const o of orders){
     const k=o.kitchenPrint;if(!k||!OPEN.includes(k.status))continue;
     // Bon nur, solange die Bestellung in der Küche ist. Sonst sichtbar überspringen statt Altbon zu drucken.
     if(!KITCHEN_STATES.includes(o.status)){k.status='skipped';k.skippedAt=nowIso;k.reason='Bestellung war beim Druck nicht mehr in der Küche';changed=true;continue}
     if(jobs.length>=MAX_JOBS_PER_CLAIM)continue;
+    // Drucker meldet „nicht bereit“: Auftrag NICHT vergeben – er bleibt gespeichert und geht raus,
+    // sobald der Drucker wieder bereit ist (keine unnötigen Fehlversuche, kein wachsender Wartezeit-Abstand).
+    if(printerReady===false){waiting++;continue}
     const leaseExpired=k.status==='claimed'&&!(Date.parse(k.leaseUntil)>now);
-    const due=k.status==='queued'&&!(Date.parse(k.nextAttemptAt)>now);
+    // Drucker gerade wieder bereit geworden → wartende Aufträge sofort, ohne Backoff.
+    const due=k.status==='queued'&&(body.retryNow===true||!(Date.parse(k.nextAttemptAt)>now));
     if(!leaseExpired&&!due)continue;
     k.status='claimed';k.claimedAt=nowIso;k.leaseUntil=new Date(now+LEASE_MS).toISOString();k.attempts=(k.attempts||0)+1;k.agentId=agentId;changed=true;
     jobs.push({jobId:k.jobId,orderId:o.id,attempt:k.attempts,ticket:ticketFor(o)});
    }
    // Älteste zuerst drucken.
    jobs.sort((a,b)=>(Date.parse(a.ticket.acceptedAt)||0)-(Date.parse(b.ticket.acceptedAt)||0));
-   out.jobs=jobs;
+   out.jobs=jobs;out.waiting=waiting;
   }else{
    const o=orders.find(x=>x.id===body.orderId);const k=o?.kitchenPrint;
    if(!k||k.jobId!==body.jobId){out.ok=false;out.unknown=true}
