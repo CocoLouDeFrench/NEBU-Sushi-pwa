@@ -113,3 +113,13 @@ test('offline NEBU Control: nothing lost, cycle throws for backoff',async()=>{
  await cycle({},j,{apiCall:srv.call,status:okPrinter,send:async()=>{prints++;return {}}});
  assert.equal(prints,1);
 });
+
+test('config written by Windows PowerShell (UTF-8 with BOM) is accepted; parse errors never echo file content',()=>{
+ const f=path.join(dir,'bom.json');
+ const secret='geheim-'.repeat(8);
+ fs.writeFileSync(f,'\uFEFF'+JSON.stringify({apiUrl:'https://nebu-iphone-push-test.netlify.app',token:secret,printer:{mode:'tcp',host:'192.168.178.33'}},null,4).replace(/\n/g,'\r\n'));
+ const c=loadConfig(f);
+ assert.equal(c.printer.host,'192.168.178.33');assert.equal(c.printer.port,9100);
+ fs.writeFileSync(f,'\uFEFF{"token":"'+secret+'", kaputt');
+ assert.throws(()=>loadConfig(f),e=>/kein gültiges JSON/.test(e.message)&&!e.message.includes(secret));
+});

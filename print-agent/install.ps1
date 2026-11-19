@@ -42,6 +42,8 @@ if([int]($ver.TrimStart('v').Split('.')[0]) -lt 18){ throw "Node.js $ver ist zu 
 Write-Host "Node.js $ver · $node"
 
 Step 'Programmdateien kopieren'
+Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CommandLine -match 'nebu-print-agent' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
 Copy-Item -Force (Join-Path $Here 'nebu-print-agent.mjs'),(Join-Path $Here 'escpos.mjs') $AppDir
 Copy-Item -Force (Join-Path $Here 'package.json') $AppDir
@@ -51,6 +53,10 @@ New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
 # Nur SYSTEM und Administratoren dürfen Konfiguration (Token), Journal und Protokolle lesen.
 icacls $DataDir /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
 if(Test-Path $Config){
+  $raw = [IO.File]::ReadAllBytes($Config)
+  if($raw.Length -ge 3 -and $raw[0] -eq 0xEF -and $raw[1] -eq 0xBB -and $raw[2] -eq 0xBF){
+    [IO.File]::WriteAllBytes($Config, [byte[]]$raw[3..($raw.Length-1)]); Write-Host 'Konfiguration repariert (BOM entfernt).'
+  }
   Write-Host "Vorhandene Konfiguration bleibt erhalten: $Config"
 }else{
   if($Mode -eq 'tcp' -and -not $PrinterHost){
@@ -76,7 +82,9 @@ if(Test-Path $Config){
   }
   if($token.Length -lt 32){ throw 'Token zu kurz.' }
   $printer = if($Mode -eq 'tcp'){ @{ mode='tcp'; host=$PrinterHost; port=9100 } } else { @{ mode='windows'; name=$PrinterName } }
-  @{ apiUrl=$ApiUrl; token=$token; pollSeconds=5; agentId=$env:COMPUTERNAME; printer=$printer } | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 $Config
+  $json = @{ apiUrl=$ApiUrl; token=$token; pollSeconds=5; agentId=$env:COMPUTERNAME; printer=$printer } | ConvertTo-Json -Depth 4
+  # UTF-8 OHNE BOM schreiben (Node.js kann BOM nicht lesen).
+  [IO.File]::WriteAllText($Config, $json, (New-Object Text.UTF8Encoding $false))
   Write-Host "Konfiguration geschrieben: $Config (Drucker: $($printer.host)$($printer.name))"
 }
 # Einmal-Tokendatei nicht liegen lassen.
@@ -84,6 +92,7 @@ if($TokenFile -and (Test-Path $TokenFile)){ Remove-Item -Force $TokenFile; Write
 
 Step 'Prüfung (Drucker + NEBU Control)'
 & $node (Join-Path $AppDir 'nebu-print-agent.mjs') --check
+if($LASTEXITCODE -ne 0){ Write-Host 'Prüfung fehlgeschlagen – Details siehe oben.' -ForegroundColor Red }
 
 Step 'Autostart einrichten (geplante Aufgabe)'
 $action    = New-ScheduledTaskAction -Execute $node -Argument "`"$AppDir\nebu-print-agent.mjs`"" -WorkingDirectory $AppDir

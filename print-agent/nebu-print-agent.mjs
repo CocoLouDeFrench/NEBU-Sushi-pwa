@@ -14,7 +14,7 @@ import {execFile} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {renderTicket,renderTestPage,STATUS_QUERIES,interpretStatus} from './escpos.mjs';
 
-export const VERSION='1.0.0';
+export const VERSION='1.0.1';
 const HERE=path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR=process.env.NEBU_PRINT_DATA||(process.platform==='win32'?path.join(process.env.ProgramData||'C:\\ProgramData','NEBU-Druckdienst'):path.join(os.homedir(),'.nebu-druckdienst'));
 const CONFIG_PATH=process.env.NEBU_PRINT_CONFIG||path.join(DATA_DIR,'config.json');
@@ -37,7 +37,11 @@ function pruneLogs(){try{for(const f of fs.readdirSync(LOG_DIR)){const p=path.jo
 
 // ---------- Konfiguration (Zugangsdaten nur hier, nie im Code) ----------
 export function loadConfig(file=CONFIG_PATH){
- const c=JSON.parse(fs.readFileSync(file,'utf8'));
+ // Windows PowerShell 5.1 schreibt UTF-8 mit BOM – vor dem Parsen entfernen.
+ // Fehlermeldung bewusst ohne Dateiausschnitt, damit der Token nie in Protokolle gelangt.
+ let c;
+ try{c=JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/,''))}
+ catch(e){throw Error(e.code==='ENOENT'?'Konfiguration fehlt: '+file:'config.json ist kein gültiges JSON ('+file+')')}
  const errors=[];
  if(!/^https:\/\/[^/]+/.test(c.apiUrl||''))errors.push('apiUrl muss eine https-Adresse sein');
  if(/shop\.nebusushi\.com/i.test(c.apiUrl||'')&&c.allowProduction!==true)errors.push('apiUrl zeigt auf den Live-Shop – im Testbetrieb nicht erlaubt');
@@ -54,7 +58,7 @@ export function loadConfig(file=CONFIG_PATH){
 // Eintrag wird VOR dem Senden an den Drucker dauerhaft gespeichert.
 // state: sending → printed; acked=true sobald NEBU Control den Druck bestätigt hat.
 export class Journal{
- constructor(file=JOURNAL_PATH){this.file=file;this.entries={};try{this.entries=JSON.parse(fs.readFileSync(file,'utf8'))}catch{}}
+ constructor(file=JOURNAL_PATH){this.file=file;this.entries={};try{this.entries=JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/,''))}catch{}}
  get(id){return this.entries[id]}
  set(id,patch){this.entries[id]={...this.entries[id],...patch,updatedAt:new Date().toISOString()};this.save()}
  remove(id){delete this.entries[id];this.save()}
