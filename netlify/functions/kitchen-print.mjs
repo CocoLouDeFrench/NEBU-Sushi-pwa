@@ -40,7 +40,7 @@ export default async req=>{
  if(!body||typeof body!=='object'||Array.isArray(body))return json({error:'Ungültige Anfrage'},400);
  const agentId=text(body.agentId,60)||'unbekannt';
  if(!['claim','ack'].includes(body.action))return json({error:'Ungültige Aktion'},400);
- if(body.action==='ack'&&(typeof body.jobId!=='string'||body.jobId.length>80||typeof body.orderId!=='string'||body.orderId.length>80||!['printed','failed'].includes(body.result)))return json({error:'Ungültige Druckbestätigung'},422);
+ if(body.action==='ack'&&(typeof body.jobId!=='string'||body.jobId.length>80||typeof body.orderId!=='string'||body.orderId.length>80||!['printed','failed','unconfirmed'].includes(body.result)))return json({error:'Ungültige Druckbestätigung'},422);
 
  if(body.action==='claim'){
   // Lebenszeichen für die Anzeige „Druckdienst online“ in NEBU Control.
@@ -77,7 +77,9 @@ export default async req=>{
    const o=orders.find(x=>x.id===body.orderId);const k=o?.kitchenPrint;
    if(!k||k.jobId!==body.jobId){out.ok=false;out.unknown=true}
    else if(k.status==='printed'){out.ok=true;out.alreadyPrinted=true}
-   else if(body.result==='printed'){k.status='printed';k.printedAt=nowIso;k.agentId=agentId;delete k.leaseUntil;delete k.nextAttemptAt;if(body.uncertain===true)k.uncertain=true;changed=true;out.ok=true}
+   else if(body.result==='printed'){k.status='printed';k.printedAt=nowIso;k.agentId=agentId;delete k.leaseUntil;delete k.nextAttemptAt;delete k.lastError;changed=true;out.ok=true}
+   // Daten sind beim Drucker, Druck aber nicht bestätigt: NICHT erneut vergeben (Doppeldruck-Schutz), Personal prüft.
+   else if(body.result==='unconfirmed'){k.status='unconfirmed';k.sentAt=nowIso;k.agentId=agentId;k.lastError=text(body.error,200)||'Druck nicht bestätigt';delete k.leaseUntil;delete k.nextAttemptAt;changed=true;out.ok=true}
    else if(k.status==='skipped'){out.ok=true}
    else{k.status='queued';k.lastError=text(body.error,200)||'Druckfehler';k.lastErrorAt=nowIso;k.nextAttemptAt=new Date(now+retryDelayMs(k.attempts||1)).toISOString();delete k.leaseUntil;changed=true;out.ok=true;out.retryAt=k.nextAttemptAt}
   }

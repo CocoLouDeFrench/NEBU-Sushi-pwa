@@ -14,7 +14,7 @@ import {execFile} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {renderTicket,renderTestPage,STATUS_QUERIES,interpretStatus} from './escpos.mjs';
 
-export const VERSION='1.0.2';
+export const VERSION='1.1.0';
 const HERE=path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR=process.env.NEBU_PRINT_DATA||(process.platform==='win32'?path.join(process.env.ProgramData||'C:\\ProgramData','NEBU-Druckdienst'):path.join(os.homedir(),'.nebu-druckdienst'));
 const CONFIG_PATH=process.env.NEBU_PRINT_CONFIG||path.join(DATA_DIR,'config.json');
@@ -62,7 +62,7 @@ export class Journal{
  get(id){return this.entries[id]}
  set(id,patch){this.entries[id]={...this.entries[id],...patch,updatedAt:new Date().toISOString()};this.save()}
  remove(id){delete this.entries[id];this.save()}
- pendingAcks(){return Object.entries(this.entries).filter(([,e])=>!e.acked&&['printed','sending'].includes(e.state)).map(([jobId,e])=>({jobId,...e}))}
+ pendingAcks(){return Object.entries(this.entries).filter(([,e])=>!e.acked&&['printed','sending','unconfirmed'].includes(e.state)).map(([jobId,e])=>({jobId,...e}))}
  save(){
   const cutoff=Date.now()-7*86400000;
   for(const [k,e] of Object.entries(this.entries))if(e.acked&&Date.parse(e.updatedAt)<cutoff)delete this.entries[k];
@@ -74,22 +74,53 @@ export class Journal{
 // ---------- Drucker ----------
 class PrintError extends Error{constructor(msg,{sent=false}={}){super(msg);this.sent=sent}}
 
-// TCP/9100 direkt zum Epson (LAN). Status vor UND nach dem Druck wird abgefragt.
+// TCP/9100 direkt zum Epson (LAN).
+// Echtzeit-Status (DLE EOT) vor dem Druck; nach dem Druck Bestätigung per Epson-Prozess-ID (GS ( H):
+// Der Drucker sendet sie erst, wenn alle vorherigen Daten wirklich gedruckt (und geschnitten) sind.
+export const PID_WAIT_MS=90000; // < Server-Lease (120 s)
 export function tcpSession(printer){
  return new Promise((resolve,reject)=>{
   const sock=net.createConnection({host:printer.host,port:printer.port});
-  let buf=Buffer.alloc(0),waiter=null;
-  const fail=e=>{sock.destroy();reject(new PrintError('Drucker nicht erreichbar ('+printer.host+'): '+e.message))};
-  sock.setTimeout(printer.timeoutMs,()=>fail(Error('Zeitüberschreitung')));
+  let buf=Buffer.alloc(0),waiter=null,settled=false;
+  const fail=e=>{if(settled)return;settled=true;sock.destroy();reject(new PrintError('Drucker nicht erreichbar ('+printer.host+'): '+e.message+(/Zeitüberschreitung/.test(e.message)?' – Drucker aus/offline oder Port 9100 belegt (Windows-Druckwarteschlange prüfen)':'')))};
+  sock.setTimeout(printer.timeoutMs,()=>fail(Error('Zeitüberschreitung beim Verbinden')));
   sock.once('error',fail);
   sock.on('data',d=>{buf=Buffer.concat([buf,d]);waiter?.()});
   sock.once('connect',()=>{
+   settled=true;
+   sock.setTimeout(0); // Verbindungs-Timeout gilt nur für den Aufbau, nicht für lange Druckwartezeiten
    sock.removeListener('error',fail);
-   let broken=null;sock.on('error',e=>{broken=e;waiter?.()});
-   const readByte=ms=>new Promise(res=>{const t=setTimeout(()=>{waiter=null;res(undefined)},ms);waiter=()=>{if(buf.length||broken){clearTimeout(t);waiter=null;const b=buf[0];buf=buf.subarray(1);res(b)}};waiter()});
+   let broken=null;
+   sock.on('error',e=>{broken=e;waiter?.()});
+   sock.on('close',()=>{broken=broken||Error('Verbindung vom Drucker geschlossen');waiter?.()});
+   // Liest das erste Byte, das pred erfüllt; verspätete/fremde Bytes werden verworfen.
+   const readMatching=(pred,ms)=>new Promise(res=>{
+    const t=setTimeout(()=>{waiter=null;res(undefined)},ms);
+    waiter=()=>{while(buf.length){const b=buf[0];buf=buf.subarray(1);if(pred(b)){clearTimeout(t);waiter=null;return res(b)}}if(broken){clearTimeout(t);waiter=null;res(undefined)}};
+    waiter();
+   });
+   const isStatusByte=b=>(b&0x93)===0x12; // Epson DLE-EOT-Antwort: Bit1=1, Bit4=1, Bit0=0, Bit7=0
    resolve({
-    async status(){const out=[];for(const q of STATUS_QUERIES){if(broken)break;sock.write(Buffer.from(q));out.push(await readByte(1500))}return interpretStatus(out)},
+    async status(){
+     const raw=[];
+     for(const q of STATUS_QUERIES){
+      if(broken)break;
+      buf=Buffer.alloc(0); // alte, verspätete Antworten verwerfen
+      sock.write(Buffer.from(q));
+      raw.push(await readMatching(isStatusByte,1500));
+     }
+     return interpretStatus(raw);
+    },
     write(bytes){return new Promise((res,rej)=>{if(broken)return rej(broken);sock.write(bytes,e=>e?rej(e):res())})},
+    // Wartet auf die Prozess-ID-Antwort 0x37 0x22 d1 d2 d3 d4 0x00.
+    waitProcessId(id,ms){
+     const want=Buffer.from([0x37,0x22,...Buffer.from(id,'ascii'),0x00]);
+     return new Promise(res=>{
+      const t=setTimeout(()=>{waiter=null;res(false)},ms);
+      waiter=()=>{const i=buf.indexOf(want);if(i>=0){clearTimeout(t);waiter=null;buf=buf.subarray(i+want.length);return res(true)}if(broken){clearTimeout(t);waiter=null;res(false)}};
+      waiter();
+     });
+    },
     close(){return new Promise(res=>{sock.end(()=>res());setTimeout(()=>{sock.destroy();res()},2000)})},
     get broken(){return broken}
    });
@@ -100,17 +131,24 @@ export async function printerStatus(printer){
  if(printer.mode==='windows')return windowsPrinterStatus(printer);
  let s;try{s=await tcpSession(printer);return await s.status()}catch(e){return {ok:false,detail:e.message}}finally{await s?.close()}
 }
-async function printTcp(printer,bytes){
+const processIdCommand=id=>Buffer.from([0x1d,0x28,0x48,0x06,0x00,0x30,0x30,...Buffer.from(id,'ascii')]);
+// Ergebnis: {confirmed:true} = nachweislich gedruckt.
+// Wirft PrintError({sent:false}) = nichts gesendet → später erneut versuchen.
+// Wirft PrintError({sent:true}) = Daten im Drucker, Druck NICHT bestätigt → kein automatischer Neudruck (Doppeldruck-Schutz).
+async function printTcp(printer,bytes,{pidWaitMs=PID_WAIT_MS,skipPrecheck=false}={}){
  const s=await tcpSession(printer);
  let sent=false;
  try{
-  const before=await s.status();
+  const before=skipPrecheck?{ok:true}:await s.status();
   if(!before.ok)throw new PrintError('Drucker nicht bereit: '+before.detail);
-  sent=true;await s.write(bytes);
-  const after=await s.status();
-  if(s.broken)throw new PrintError('Verbindung während des Drucks abgebrochen',{sent:true});
-  // Papier leer nach dem Druck: Bon kann unvollständig sein → als „unsicher“ melden.
-  return {uncertain:!after.ok,detail:after.detail};
+  const id=String(Math.floor(Math.random()*10000)).padStart(4,'0');
+  sent=true;
+  await s.write(Buffer.concat([bytes,processIdCommand(id)]));
+  // Ist der Deckel währenddessen offen oder das Papier leer, hält der Epson die Daten und
+  // druckt nach dem Beheben weiter – dann kommt die Bestätigung eben später (bis PID_WAIT_MS).
+  if(await s.waitProcessId(id,pidWaitMs))return {confirmed:true,detail:'gedruckt (vom Drucker bestätigt)'};
+  const after=s.broken?{ok:false,detail:'Verbindung unterbrochen'}:await s.status();
+  throw new PrintError('Druck nicht vom Drucker bestätigt ('+after.detail+')',{sent:true});
  }catch(e){if(e instanceof PrintError)throw e;throw new PrintError(e.message,{sent})}
  finally{await s.close()}
 }
@@ -143,10 +181,11 @@ async function windowsPrinterStatus(printer){
 async function printWindows(printer,bytes){
  const tmp=path.join(DATA_DIR,'spool-'+process.pid+'-'+Date.now()+'.bin');const script=path.join(DATA_DIR,'raw-print.ps1');
  fs.writeFileSync(script,PS_RAW);fs.writeFileSync(tmp,bytes);
- try{await powershell(['-File',script,'-Printer',printer.name,'-File',tmp]);return {uncertain:false,detail:'an Windows-Spooler übergeben'}}
+ try{await powershell(['-File',script,'-Printer',printer.name,'-File',tmp]);return {confirmed:true,detail:'an Windows-Spooler übergeben'}}
  catch(e){throw new PrintError('Windows-Druck fehlgeschlagen: '+e.message)}
  finally{try{fs.unlinkSync(tmp)}catch{}}
 }
+export const printTcpForTest=printTcp;export const PrintErrorForTest=PrintError;
 export async function sendToPrinter(printer,bytes){return printer.mode==='windows'?printWindows(printer,bytes):printTcp(printer,bytes)}
 
 // ---------- NEBU Control ----------
@@ -159,41 +198,60 @@ export async function api(cfg,body){
 }
 
 // ---------- Ein Durchlauf ----------
+// Journal-Zustände: sending (Daten gehen gerade raus) → printed (vom Drucker bestätigt) | unconfirmed (gesendet, nicht bestätigt).
+// Gemeldet wird nur, was feststeht: 'printed' nur nach Druckerbestätigung, sonst 'unconfirmed' (kein automatischer Neudruck).
+const STATUS_INTERVAL_MS=30000;const cycleState={};
+const resultFor=e=>e.state==='printed'?'printed':'unconfirmed';
 export async function cycle(cfg,journal,deps={}){
  const {apiCall=api,status=printerStatus,send=sendToPrinter}=deps;
- // 1) Offene Bestätigungen nachholen (z. B. nach Internetausfall).
+ // 1) Offene Rückmeldungen nachholen (z. B. nach Internetausfall oder Neustart mitten im Druck).
  for(const e of journal.pendingAcks()){
-  try{const r=await apiCall(cfg,{action:'ack',jobId:e.jobId,orderId:e.orderId,result:'printed',uncertain:e.state==='sending'||e.uncertain===true});
-   journal.set(e.jobId,{acked:true});log('INFO','Druck von #'+e.orderId+' an NEBU Control bestätigt'+(r.alreadyPrinted?' (war bereits bestätigt)':''))}
-  catch(err){log('WARN','Bestätigung für #'+e.orderId+' noch offen: '+err.message);throw err}
+  const result=resultFor(e);
+  try{await apiCall(cfg,{action:'ack',jobId:e.jobId,orderId:e.orderId,result,error:result==='unconfirmed'?(e.error||'Druck nicht bestätigt'):undefined});
+   journal.set(e.jobId,{acked:true});log('INFO','Rückmeldung für #'+e.orderId+' nachgeholt: '+result)}
+  catch(err){log('WARN','Rückmeldung für #'+e.orderId+' noch offen: '+err.message);throw err}
  }
- // 2) Drucker prüfen, neue Aufträge abholen.
- const printer=await status(cfg.printer);
- const {jobs=[]}=await apiCall(cfg,{action:'claim',printer});
- const result={printer,printed:0,failed:0,deduplicated:0};
+ // 2) Neue Aufträge abholen. Den Drucker nur alle 30 s für die Statusanzeige ansprechen (weniger
+ //    Verbindungen auf Port 9100) – und immer frisch, sobald tatsächlich ein Auftrag da ist.
+ const st=deps.state||cycleState;
+ let fresh=false;
+ if(!st.printer||Date.now()-st.printerAt>=STATUS_INTERVAL_MS){st.printer=await status(cfg.printer);st.printerAt=Date.now();fresh=true}
+ const {jobs=[]}=await apiCall(cfg,{action:'claim',printer:st.printer});
+ if(jobs.length&&!fresh){st.printer=await status(cfg.printer);st.printerAt=Date.now()}
+ const printer=st.printer;
+ const result={printer,printed:0,failed:0,unconfirmed:0,deduplicated:0};
  for(const job of jobs){
   const known=journal.get(job.jobId);
-  if(known&&['printed','sending'].includes(known.state)){
-   // Schon gedruckt (oder Druck lief beim Absturz) → NICHT erneut drucken, nur bestätigen.
-   result.deduplicated++;log('INFO','#'+job.orderId+' bereits gedruckt – kein zweiter Bon');
-   await apiCall(cfg,{action:'ack',jobId:job.jobId,orderId:job.orderId,result:'printed',uncertain:known.state==='sending'||known.uncertain===true});
+  if(known&&['printed','sending','unconfirmed'].includes(known.state)){
+   // Bereits an den Drucker gegangen → NIE automatisch erneut drucken, nur Stand melden.
+   result.deduplicated++;log('INFO','#'+job.orderId+' wurde bereits an den Drucker gesendet – kein zweiter Bon');
+   const r=resultFor(known);
+   await apiCall(cfg,{action:'ack',jobId:job.jobId,orderId:job.orderId,result:r,error:r==='unconfirmed'?(known.error||'Druck nicht bestätigt'):undefined});
    journal.set(job.jobId,{acked:true});continue;
   }
   if(!printer.ok){
    await apiCall(cfg,{action:'ack',jobId:job.jobId,orderId:job.orderId,result:'failed',error:printer.detail}).catch(()=>{});
-   result.failed++;log('WARN','#'+job.orderId+' wartet: '+printer.detail);continue;
+   result.failed++;log('WARN','#'+job.orderId+' wartet, nichts gesendet: '+printer.detail);continue;
   }
   journal.set(job.jobId,{orderId:job.orderId,state:'sending',acked:false});
   try{
    const out=await send(cfg.printer,renderTicket(job.ticket));
-   journal.set(job.jobId,{state:'printed',uncertain:out.uncertain,printedAt:new Date().toISOString()});
+   if(out.confirmed===false)throw new PrintError(out.detail||'Druck nicht bestätigt',{sent:true});
+   journal.set(job.jobId,{state:'printed',printedAt:new Date().toISOString()});
    result.printed++;log('INFO','Küchenbon #'+job.orderId+' gedruckt ('+out.detail+')');
   }catch(e){
-   if(e.sent){journal.set(job.jobId,{state:'sending',uncertain:true});log('ERROR','#'+job.orderId+' Druck unterbrochen – wird NICHT automatisch wiederholt (Doppeldruck-Schutz): '+e.message)}
-   else{journal.remove(job.jobId);await apiCall(cfg,{action:'ack',jobId:job.jobId,orderId:job.orderId,result:'failed',error:e.message}).catch(()=>{});result.failed++;log('WARN','#'+job.orderId+' nicht gedruckt, neuer Versuch folgt: '+e.message);continue}
+   if(e.sent){
+    journal.set(job.jobId,{state:'unconfirmed',error:String(e.message).slice(0,180)});result.unconfirmed++;
+    log('ERROR','#'+job.orderId+' gesendet, aber nicht bestätigt – kein automatischer Neudruck (Doppeldruck-Schutz): '+e.message);
+   }else{
+    journal.remove(job.jobId);
+    await apiCall(cfg,{action:'ack',jobId:job.jobId,orderId:job.orderId,result:'failed',error:e.message}).catch(()=>{});
+    result.failed++;log('WARN','#'+job.orderId+' nicht gesendet, neuer Versuch folgt: '+e.message);continue;
+   }
   }
-  try{await apiCall(cfg,{action:'ack',jobId:job.jobId,orderId:job.orderId,result:'printed',uncertain:journal.get(job.jobId).uncertain===true});journal.set(job.jobId,{acked:true})}
-  catch(e){log('WARN','Bestätigung für #'+job.orderId+' wird nachgeholt: '+e.message)}
+  const e=journal.get(job.jobId);const r=resultFor(e);
+  try{await apiCall(cfg,{action:'ack',jobId:job.jobId,orderId:job.orderId,result:r,error:r==='unconfirmed'?e.error:undefined});journal.set(job.jobId,{acked:true})}
+  catch(err){log('WARN','Rückmeldung für #'+job.orderId+' wird nachgeholt: '+err.message)}
  }
  return result;
 }

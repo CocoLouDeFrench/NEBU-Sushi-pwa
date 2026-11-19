@@ -102,7 +102,9 @@ export function renderTestPage(){
 // Echtzeit-Statusabfragen (DLE EOT n). Antwort jeweils 1 Byte.
 export const STATUS_QUERIES=[[DLE,0x04,1],[DLE,0x04,2],[DLE,0x04,4]];
 export function interpretStatus([s1,s2,s4]){
- if(s1===undefined)return {ok:false,detail:'keine Antwort vom Drucker'};
+ // Nur eine vollständige Antwort gilt als „bereit“ – fehlende Antworten bedeuten: nicht bereit.
+ if(s1===undefined)return {ok:false,detail:'keine Antwort vom Drucker (offline, Deckel offen oder Fehler?)'};
+ if(s2===undefined||s4===undefined)return {ok:false,detail:'Drucker antwortet unvollständig (offline?)'};
  const problems=[];
  if(s2!==undefined){
   if(s2&0x04)problems.push('Deckel offen');

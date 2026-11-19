@@ -89,3 +89,12 @@ test('customer status response does not expose print internals',async()=>{
  const r=await read(await orders(new Request('https://x/',{method:'POST',body:JSON.stringify({action:'status',id:'T1',token:'tok'})})));
  assert.equal(r.order.kitchenPrint,undefined);
 });
+
+test('unconfirmed print is not handed out again and not shown as printed',async()=>{
+ set(base());await accept('T1');
+ const {jobs:[job]}=await read(await agent({action:'claim'}));
+ assert.equal((await read(await agent({action:'ack',jobId:job.jobId,orderId:'T1',result:'unconfirmed',error:'Papier leer'}))).ok,true);
+ assert.equal(order('T1').kitchenPrint.status,'unconfirmed');
+ order('T1').kitchenPrint.leaseUntil=new Date(Date.now()-1).toISOString();
+ assert.equal((await read(await agent({action:'claim'}))).jobs.length,0,'kein automatischer Neudruck');
+});
