@@ -7,6 +7,8 @@ const DEFAULT_STATE = {
 };
 
 export default async (req) => {
+  // Disable this legacy admin endpoint only on the dedicated NEBU test site.
+  if(Netlify.env.get('SITE_ID')==='ed3132b0-8acf-40ef-a45d-79c12597e622')return new Response('Not Found',{status:404});
 
   const store = getStore("nebu-sushi-state");
 
