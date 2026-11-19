@@ -11,7 +11,7 @@ Holt **angenommene** Bestellungen aus NEBU Control und druckt sie automatisch al
 ## Installation
 PowerShell **als Administrator**: `powershell -ExecutionPolicy Bypass -File .\install.ps1`
 
-Server-Voraussetzung: Umgebungsvariable `NEBU_PRINT_AGENT_TOKEN` (≥ 32 Zeichen) im **Test**-Netlify-Projekt. Der Token steht nur in `config.json` auf dem PC (nur SYSTEM/Administratoren lesbar), nie im Code.
+Das Skript erzeugt den Schlüssel `NEBU_PRINT_AGENT_TOKEN` auf dem PC; er wird im **Test**-Netlify-Projekt als Umgebungsvariable eingetragen. Der Token steht nur in `config.json` auf dem PC (nur SYSTEM/Administratoren lesbar), nie im Code.
 
 ## Bedienung
 - Status: http://127.0.0.1:47123/

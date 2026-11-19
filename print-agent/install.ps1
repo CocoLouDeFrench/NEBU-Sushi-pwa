@@ -60,7 +60,20 @@ if(Test-Path $Config){
   }
   if($Mode -eq 'windows' -and -not $PrinterName){ $PrinterName = (Get-Printer | Where-Object { $_.Name -match 'TM-T20' } | Select-Object -First 1).Name }
   if($TokenFile -and (Test-Path $TokenFile)){ $token = (Get-Content -Raw $TokenFile).Trim() }
-  else{ $sec = Read-Host 'Druckdienst-Token (NEBU_PRINT_AGENT_TOKEN)' -AsSecureString; $token = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)) }
+  else{
+    # Neuen zufälligen Schlüssel auf diesem PC erzeugen (verlässt den PC nur über die Zwischenablage nach Netlify).
+    $bytes = New-Object byte[] 36; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $token = [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+','-').Replace('/','_')
+    Set-Clipboard -Value $token
+    Write-Host ''
+    Write-Host 'Neuer Druckdienst-Schlüssel wurde erzeugt und in die Zwischenablage kopiert.' -ForegroundColor Green
+    Write-Host 'Jetzt in Netlify eintragen (nur TESTprojekt nebu-iphone-push-test):'
+    Write-Host '  Project configuration > Environment variables > Add a variable'
+    Write-Host '  Key:   NEBU_PRINT_AGENT_TOKEN'
+    Write-Host '  Value: Strg+V  (Option "Contains secret values" anhaken, falls angeboten)'
+    Write-Host 'Danach in Netlify: Deploys > Trigger deploy > Deploy project.'
+    Read-Host 'Wenn Variable gespeichert und Deploy fertig ist, Enter drücken'
+  }
   if($token.Length -lt 32){ throw 'Token zu kurz.' }
   $printer = if($Mode -eq 'tcp'){ @{ mode='tcp'; host=$PrinterHost; port=9100 } } else { @{ mode='windows'; name=$PrinterName } }
   @{ apiUrl=$ApiUrl; token=$token; pollSeconds=5; agentId=$env:COMPUTERNAME; printer=$printer } | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 $Config
