@@ -1,5 +1,5 @@
 import {getStore} from '@netlify/blobs';
-import {issueStaffSession} from './nebu-staff-session.mjs';
+import {issueStaffSession,verifyStaffSession,SHIFT_SECONDS} from './nebu-staff-session.mjs';
 const reply=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store, private','pragma':'no-cache','x-content-type-options':'nosniff','referrer-policy':'no-referrer'}});
 const digest=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))).map(x=>x.toString(16).padStart(2,'0')).join('');
 export default async req=>{
@@ -7,6 +7,15 @@ export default async req=>{
  const secret=Netlify.env.get('NEBU_TEST_SESSION_SECRET');
  const adminKey=Netlify.env.get('NEBU_TEST_ADMIN_KEY');
  if(!secret||secret.length<32||!adminKey)return reply({error:'Sitzungsanmeldung noch nicht konfiguriert'},503);
+ // Verlängerung einer noch gültigen Sitzung (ohne Code), höchstens bis Schichtende.
+ const bearer=req.headers.get('authorization')||'';
+ if(bearer.startsWith('Bearer ')){
+  const current=await verifyStaffSession(bearer.slice(7),secret);
+  if(!current)return reply({error:'Sitzung abgelaufen'},403);
+  const token=await issueStaffSession(secret,{authTime:current.auth});
+  const exp=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(token.split('.')[0].replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)))).exp;
+  return reply({token,expiresInSeconds:exp-Math.floor(Date.now()/1000),sessionEndsAt:new Date((current.auth+SHIFT_SECONDS)*1000).toISOString()});
+ }
  const ip=req.headers.get('x-nf-client-connection-ip');
  if(!ip)return reply({error:'Anmeldung derzeit nicht verfügbar'},503);
  // Test-only best-effort throttle. Netlify Blobs read/modify/write is NOT atomic.
@@ -26,5 +35,5 @@ export default async req=>{
   return reply({error:'Zugang verweigert'},403);
  }
  const token=await issueStaffSession(secret);
- return reply({token,expiresInSeconds:1800});
+ return reply({token,expiresInSeconds:1800,sessionEndsAt:new Date((Math.floor(Date.now()/1000)+SHIFT_SECONDS)*1000).toISOString()});
 };
