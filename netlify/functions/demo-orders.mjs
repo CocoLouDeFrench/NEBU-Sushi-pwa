@@ -28,10 +28,11 @@ export default async req=>{
   if(!['create','status','inventory','inventory-update','update'].includes(body.action))return json({error:'Ungültige Aktion'},400);
   if(body.action==='status'&&(typeof body.id!=='string'||body.id.length>80||typeof body.token!=='string'||body.token.length>160))return json({error:'Ungültige Statusanfrage'},400);
   if(body.action==='update'){
-   const allowed=new Set(['action','id','expectedVersion','status','eta','riskReviewed','cancelReason','paymentReceived']);
+   const allowed=new Set(['action','id','expectedVersion','status','eta','riskReviewed','cancelReason','paymentReceived','paymentReason']);
    if(Object.keys(body).some(key=>!allowed.has(key)))return json({error:'Nicht erlaubte Bestelländerung'},422);
    if(typeof body.id!=='string'||body.id.length>80||!Number.isInteger(body.expectedVersion)||body.expectedVersion<0)return json({error:'Ungültige Bestellversion'},422);
    if(body.status!==undefined&&typeof body.status!=='string')return json({error:'Ungültiger Bestellstatus'},422);
+   if(body.paymentReason!==undefined&&(typeof body.paymentReason!=='string'||body.paymentReason.length>300))return json({error:'Ungültige Begründung'},422);
   }
  }
  const db=getDatabase();let client=null;
@@ -65,7 +66,7 @@ export default async req=>{
   if(!Array.isArray(ids)||ids.length>100||ids.some(id=>typeof id!=='string'||!lookup.has(id)))return json({error:'Ungültige Artikelliste'},422);
   await inventoryStore.setJSON('disabled',[...new Set(ids)]);return json({disabled:[...new Set(ids)]});
  }
- if(body.action==='status'){const order=orders.find(o=>o.id===body.id);if(!order||!body.token||body.token!==order.customerToken)return json({error:'Bestellung nicht gefunden oder Zugriff verweigert'},403);const {customerToken,customer,email,phone,address,bell,floor,notes,riskFlag,...safe}=order;return json({order:safe});}
+ if(body.action==='status'){const order=orders.find(o=>o.id===body.id);if(!order||!body.token||body.token!==order.customerToken)return json({error:'Bestellung nicht gefunden oder Zugriff verweigert'},403);const {customerToken,customer,email,phone,address,bell,floor,notes,riskFlag,paymentHistory,paymentReversed,...safe}=order;return json({order:safe});}
  if(body.action==='create'){
  if(!isCustomer){
   const ip=req.headers.get('x-nf-client-connection-ip');
@@ -125,6 +126,8 @@ export default async req=>{
  if(next&&next===o.status&&(body.paymentReceived===undefined||body.paymentReceived===o.paymentReceived)){const {customerToken,...safe}=o;return json({order:safe,unchanged:true,alreadyApplied:true});}
  if(!next&&typeof body.paymentReceived==='boolean'&&body.paymentReceived===o.paymentReceived){const {customerToken,...safe}=o;return json({order:safe,unchanged:true,alreadyApplied:true});}
  if(!Number.isInteger(body.expectedVersion)||body.expectedVersion!==(o.version??0))return json({error:'Bestellung wurde auf einem anderen Gerät geändert. Bitte aktualisieren.'},409);
+ if(body.paymentReceived===true&&o.paymentReceived!==true&&!['accepted','preparing','ready','enroute'].includes(o.status))return json({error:'Zahlung kann erst nach Annahme der Bestellung bestätigt werden.'},409);
+ if(body.paymentReceived===true&&next)return json({error:'Zahlung und Statuswechsel bitte getrennt bestätigen.'},422);
 const transitions={new:['accepted','rejected'],accepted:['preparing'],preparing:['ready'],ready:o.fulfillment==='pickup'?['picked_up']:['enroute'],picked_up:[],enroute:o.fulfillment==='pickup'?['picked_up']:['delivered','delivery_failed'],delivered:[],rejected:[],delivery_failed:[]};
  if(o.fulfillment==='pickup'&&['enroute','delivered','delivery_failed'].includes(next))return json({error:'Für Selbstabholung ist dieser Lieferstatus nicht erlaubt.'},409);if(o.fulfillment!=='pickup'&&next==='picked_up')return json({error:'Abholung nur für Abholbestellungen erlaubt.'},409);if(next===o.status){const {customerToken,...safe}=o;return json({order:safe,unchanged:true});}
  if(next&&!(transitions[o.status]||[]).includes(next))return json({error:'Bestellstatus wurde bereits geändert. Bitte Ansicht aktualisieren.'},409);
@@ -132,8 +135,16 @@ const transitions={new:['accepted','rejected'],accepted:['preparing'],preparing:
  if((next==='delivered'||next==='picked_up')&&o.paymentMethod==='cash'&&o.paymentReceived!==true)return json({error:'Barzahlung noch offen: Bitte Zahlungseingang bestätigen, bevor du die Bestellung abschließt.'},409);
  if(next==='accepted'&&o.riskFlag?.level==='review'&&body.riskReviewed!==true)return json({error:'Auffälliges Bestellmuster: Bitte Bestellung prüfen und die Annahme ausdrücklich bestätigen.'},409);
  if(next==='rejected'){const reason=String(body.cancelReason||'').trim();if(!reason||reason.length>300)return json({error:'Bitte einen Ablehnungsgrund mit maximal 300 Zeichen angeben.'},422);o.cancelReason=reason;o.cancelledAt=new Date().toISOString();}if(next){if(next==='accepted'){const eta=Number(body.eta);if(![30,45,60,75].includes(eta))return json({error:'Ungültige Lieferzeit'},400);o.eta=eta;o.acceptedAt=new Date().toISOString();o.deliveryDueAt=new Date(Date.parse(o.acceptedAt)+eta*60000).toISOString()}o.status=next}
- if(typeof body.paymentReceived==='boolean'){
+ if(typeof body.paymentReceived==='boolean'&&body.paymentReceived!==o.paymentReceived){
   if(['rejected','delivery_failed'].includes(o.status))return json({error:'Bei abgelehnten oder gescheiterten Bestellungen kann keine Zahlung bestätigt werden.'},409);
+  // Payment rules (test branch): append-only log, confirm only after acceptance, reversal only with a reason.
+  const history=Array.isArray(o.paymentHistory)?o.paymentHistory:[];
+  if(history.length>=50)return json({error:'Zu viele Zahlungsänderungen für diese Bestellung. Bitte Leitung informieren.'},409);
+  const reason=String(body.paymentReason||'').trim();
+  if(body.paymentReceived===false&&reason.length<5)return json({error:'Rücknahme einer bestätigten Zahlung nur mit Begründung (mindestens 5 Zeichen).'},422);
+  const changedAt=new Date().toISOString();
+  o.paymentHistory=[...history,{at:changedAt,from:o.paymentReceived===true,to:body.paymentReceived,orderStatus:o.status,reason:body.paymentReceived===false?reason:null,actor:'shared-staff-code'}];
+  if(body.paymentReceived){o.paymentConfirmedAt=o.paymentConfirmedAt||changedAt;}else{o.paymentReversed=true;}
   o.paymentReceived=body.paymentReceived;
  }
  if(next==='delivery_failed'){o.failureReason='Zahlung verweigert';o.failedAt=new Date().toISOString();}
