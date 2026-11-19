@@ -47,6 +47,8 @@ Datenbank: Netlify Database im Live-Projekt aktivieren (eigene Datenbank, Migrat
 **Testprojekt:** zusätzlich `NEBU_OWNER_SETUP_CODE` setzen, damit nach dem nächsten Test-Deploy der Inhaber-Zugang angelegt werden kann (alter gemeinsamer Code gilt nicht mehr).
 
 ## Rückweg (Rollback)
+**Rückgabepunkt Live:** Netlify-Deploy `6af9b256cad436e00f8141c8` (Stand `main` cd94f2b, geprüft am 19.11.2026 – noch das aktuelle Live-Deploy). Release-Kandidat: Branch `release/nebu-bestellsystem`.
+
 1. Sofort: NEBU Control → 👥 → „Auf WhatsApp zurückschalten“ (Shop bestellt wieder per WhatsApp, kein Deploy nötig).
 2. Vollständig: in Netlify das vorherige Live-Deploy wieder veröffentlichen („Publish deploy“) – Rollback-Punkt = aktuelles Live-Deploy vor der Umstellung.
 3. Der Live-Druckdienst kann installiert bleiben; ohne Online-Bestellungen druckt er nichts.
