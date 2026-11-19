@@ -4,8 +4,7 @@ $out = New-Object System.Collections.Generic.List[string]
 function W($t){ $out.Add($t); Write-Host $t }
 W '=== NEBU Druckdienst · Systemprüfung ==='
 W ("Datum: " + (Get-Date -Format 'dd.MM.yyyy HH:mm'))
-$os = Get-CimInstance Win32_OperatingSystem
-W ("Windows: " + $os.Caption + " · Build " + $os.BuildNumber + " · " + $os.OSArchitecture)
+try{ $cv = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'; W ("Windows: " + $cv.ProductName + " " + $cv.DisplayVersion + " · Build " + $cv.CurrentBuild) }catch{ W ("Windows: " + [Environment]::OSVersion.VersionString) }
 W ("PC-Name: " + $env:COMPUTERNAME)
 W ''
 W '--- Drucker ---'

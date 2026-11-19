@@ -43,7 +43,7 @@ Write-Host "Node.js $ver · $node"
 
 Step 'Programmdateien kopieren'
 Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CommandLine -match 'nebu-print-agent' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+Start-Sleep -Seconds 2  # laufenden Dienst beenden lassen (Stop-ScheduledTask beendet auch node.exe)
 New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
 Copy-Item -Force (Join-Path $Here 'nebu-print-agent.mjs'),(Join-Path $Here 'escpos.mjs') $AppDir
 Copy-Item -Force (Join-Path $Here 'package.json') $AppDir
@@ -104,7 +104,34 @@ Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Pr
   -Description 'NEBU Control: druckt angenommene Bestellungen automatisch als Küchenbon (Epson TM-T20III).' -Force | Out-Null
 Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 Start-ScheduledTask -TaskName $TaskName
-Start-Sleep -Seconds 4
-try{ $h = Invoke-RestMethod -Uri 'http://127.0.0.1:47123/' -TimeoutSec 5; Write-Host ("Dienst läuft · Drucker: " + $h.printer.detail) -ForegroundColor Green }
-catch{ Write-Host "Dienst antwortet noch nicht – Protokoll: $DataDir\logs" -ForegroundColor Red }
+Step 'Abschlussprüfung'
+# 1) TCP-Verbindung zum Drucker (Port 9100), ohne WMI
+try{
+  $cfg = [IO.File]::ReadAllText($Config) | ConvertFrom-Json
+  if($cfg.printer.mode -eq 'tcp'){
+    $tcp = New-Object Net.Sockets.TcpClient
+    $ok = $tcp.ConnectAsync($cfg.printer.host, [int]$cfg.printer.port).Wait(3000) -and $tcp.Connected
+    $tcp.Close()
+    if($ok){ Write-Host ("Drucker " + $cfg.printer.host + ":" + $cfg.printer.port + " erreichbar") -ForegroundColor Green }
+    else{ Write-Host ("Drucker " + $cfg.printer.host + ":" + $cfg.printer.port + " NICHT erreichbar") -ForegroundColor Red }
+  }
+}catch{ Write-Host ('Druckertest: ' + $_.Exception.Message) -ForegroundColor Red }
+# 2) Geplante Aufgabe (Autostart)
+try{
+  $t = Get-ScheduledTask -TaskName $TaskName
+  $trig = ($t.Triggers | ForEach-Object { $_.CimClass.CimClassName }) -join ','
+  Write-Host ("Autostart: Aufgabe '" + $TaskName + "' · Status " + $t.State + " · Auslöser " + $trig + " · Konto " + $t.Principal.UserId) -ForegroundColor Green
+}catch{ Write-Host ('Autostart-Prüfung: ' + $_.Exception.Message) -ForegroundColor Red }
+# 3) Statusseite auf Port 47123 (bis zu 20 s warten)
+$h = $null
+for($i=0; $i -lt 10 -and -not $h; $i++){ Start-Sleep -Seconds 2; try{ $h = Invoke-RestMethod -Uri 'http://127.0.0.1:47123/' -TimeoutSec 3 }catch{} }
+if($h){
+  Write-Host ("Statusseite OK · Version " + $h.version + " · Drucker: " + $h.printer.detail) -ForegroundColor Green
+  if($h.lastError){ Write-Host ("Letzter Fehler: " + $h.lastError) -ForegroundColor Red }
+  elseif($h.lastOkAt){ Write-Host ("Verbindung zu NEBU Control OK · " + $h.lastOkAt) -ForegroundColor Green }
+}else{
+  Write-Host "Dienst antwortet nicht. Letzte Protokollzeilen:" -ForegroundColor Red
+  $log = Get-ChildItem (Join-Path $DataDir 'logs') -Filter *.log -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1
+  if($log){ Get-Content $log.FullName -Tail 15 }
+}
 Write-Host "`nFertig. Status: http://127.0.0.1:47123/  ·  Protokolle: $DataDir\logs"

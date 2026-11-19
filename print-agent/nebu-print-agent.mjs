@@ -14,7 +14,7 @@ import {execFile} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {renderTicket,renderTestPage,STATUS_QUERIES,interpretStatus} from './escpos.mjs';
 
-export const VERSION='1.0.1';
+export const VERSION='1.0.2';
 const HERE=path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR=process.env.NEBU_PRINT_DATA||(process.platform==='win32'?path.join(process.env.ProgramData||'C:\\ProgramData','NEBU-Druckdienst'):path.join(os.homedir(),'.nebu-druckdienst'));
 const CONFIG_PATH=process.env.NEBU_PRINT_CONFIG||path.join(DATA_DIR,'config.json');
