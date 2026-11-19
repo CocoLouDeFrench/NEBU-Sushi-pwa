@@ -1,8 +1,11 @@
+import {verifyStaffSession} from './nebu-staff-session.mjs';
 import {getStore} from '@netlify/blobs';
 import webpush from 'web-push';
 export default async(req)=>{
  if(req.method!=='POST')return new Response('Method not allowed',{status:405});
- if(!Netlify.env.get('NEBU_TEST_ADMIN_KEY')||req.headers.get('x-nebu-test-key')!==Netlify.env.get('NEBU_TEST_ADMIN_KEY'))return new Response('Unauthorized',{status:401});
+ const bearer=req.headers.get('authorization')||'';
+ const validSession=bearer.startsWith('Bearer ')&&await verifyStaffSession(bearer.slice(7),Netlify.env.get('NEBU_TEST_SESSION_SECRET'));
+ if(!validSession)return new Response('Unauthorized',{status:401});
  try{
   const store=getStore('nebu-push-test');
   const registered=await store.get('admin-subscriptions',{type:'json'})||[];
