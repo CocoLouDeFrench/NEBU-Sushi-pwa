@@ -4,20 +4,22 @@ import {readFileSync} from 'node:fs';
 let JSDOM;try{({JSDOM}=await import('jsdom'))}catch{}
 const skip=!JSDOM&&'jsdom nicht installiert (npm i --no-save jsdom@24)';
 const html=readFileSync(new URL('../push-test/index.html',import.meta.url),'utf8');
-function boot({loginOk=true,renewable=false}={}){
+function boot({loginOk=true,renewable=false,device=null,deviceValid=true}={}){
  let now=Date.UTC(2026,10,19,12,0,0);const timers=[];
  const calls=[];let orders=[{id:'T1',status:'new',fulfillment:'delivery',version:0,customer:'Anna',phone:'0211123456',address:'Kö 1',items:[{name:'Maki',qty:1,price:5}],total:5,paymentReceived:false,createdAt:new Date(now).toISOString()},
   {id:'T2',status:'enroute',fulfillment:'delivery',version:3,customer:'Ben',phone:'0211654321',address:'Kö 2',items:[],total:9,paymentReceived:true,paymentReversed:false,paymentHistory:[{at:new Date(now).toISOString(),from:false,to:true,orderStatus:'enroute',reason:null}],createdAt:new Date(now).toISOString()}];
  let serverRejects=false;let prompts=[];let confirms=true;
  const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://nebu-iphone-push-test.netlify.app/',beforeParse(w){
+  if(device)w.localStorage.setItem('nebu-staff-device',JSON.stringify(device));
   w.Date=class extends Date{constructor(...a){super(...(a.length?a:[now]))}static now(){return now}};
   w.setInterval=(fn,ms)=>{timers.push({fn,ms,next:now+ms});return timers.length};w.setTimeout=(fn)=>{fn();return 0};
   w.alert=m=>calls.push(['alert',m]);w.confirm=()=>confirms;w.prompt=()=>prompts.shift()??null;
   w.navigator.vibrate=()=>true;w.Response=globalThis.Response;
   w.fetch=async(url,init={})=>{url=String(url);const b=init.body?JSON.parse(init.body):null;calls.push([url,b&&b.action||init.method||'GET',(init.headers||{}).authorization||null]);
    const res=(st,obj)=>new w.Response(JSON.stringify(obj),{status:st,headers:{'content-type':'application/json'}});
-   if(url.endsWith('staff-login')&&renewable&&b&&b.renew){const a=(init.headers||{}).authorization||'';return a.startsWith('Bearer tok')?res(200,{token:'tok'+now,expiresInSeconds:1800,sessionEndsAt:new Date(Date.UTC(2026,10,20,0,0,0)).toISOString()}):res(403,{error:'Sitzung abgelaufen'})}
-   if(url.endsWith('staff-login')&&renewable&&b.key==='richtig')return res(200,{token:'tok'+now,expiresInSeconds:1800,sessionEndsAt:new Date(Date.UTC(2026,10,20,0,0,0)).toISOString()});
+   const ends=new Date(Date.UTC(2026,10,20,0,0,0)).toISOString();
+   if(url.endsWith('staff-login')&&renewable&&b&&b.renew){calls.push(['RENEW',b.refreshToken||null]);if(b.refreshToken)return b.refreshToken==='dev-ok'&&deviceValid?res(200,{token:'tok'+now,expiresInSeconds:1800,refreshToken:'dev-ok',sessionEndsAt:ends}):res(403,{error:'Sitzung abgelaufen'});return res(403,{error:'Sitzung abgelaufen'})}
+   if(url.endsWith('staff-login')&&renewable&&b.key==='richtig')return res(200,{token:'tok'+now,expiresInSeconds:1800,refreshToken:'dev-ok',sessionEndsAt:ends});
    if(url.endsWith('staff-login'))return loginOk&&b.key==='richtig'?res(200,{token:'tok'+now,expiresInSeconds:1800}):res(403,{error:'Zugang verweigert'});
    if(url.includes('demo-orders')){if(serverRejects)return res(403,{error:'Nur für NEBU-Mitarbeiter'});
     if(!init.method||init.method==='GET')return res(200,{orders});
@@ -102,11 +104,30 @@ test('session renews itself in the background until shift end – no repeated lo
  await t.advance(2*60*60*1000); // 2 Stunden aktiv
  assert.match(txt(t.d,'sessionInfo'),/Angemeldet/);
  assert.equal(t.d.getElementById('loginOverlay').hidden,true,'kein erneutes Anmelden');
- const renewals=t.calls.filter(c=>c[0].endsWith('staff-login')&&c[2]);
+ const renewals=t.calls.filter(c=>c[0]==='RENEW');
  assert.ok(renewals.length>=4,'Token wurde mehrfach verlängert');
  const last=t.calls.filter(c=>c[0].includes('demo-orders')).at(-1);
  assert.notEqual(last[2],'Bearer tok'+Date.UTC(2026,10,19,12,0,0),'neuer Token in Benutzung');
- assert.ok(JSON.parse(t.w.sessionStorage.getItem('nebu-staff-session')).t.startsWith('tok'),'Sitzung übersteht Neuladen im Tab');
+ const saved=JSON.parse(t.w.localStorage.getItem('nebu-staff-device'));assert.equal(saved.r,'dev-ok','Geräte-Schlüssel gespeichert');
+ assert.ok(!t.w.localStorage.getItem('nebu-staff-device').includes('richtig'),'Zugangscode wird nie gespeichert');
  t.d.getElementById('sessionButton').click();
- assert.equal(t.w.sessionStorage.getItem('nebu-staff-session'),null,'Abmelden löscht gespeicherte Sitzung');
+ assert.equal(t.w.localStorage.getItem('nebu-staff-device'),null,'Abmelden löscht gespeicherte Anmeldung');
+});
+
+test('iPhone web app reopened (new page, empty memory): session is restored without login',{skip},async()=>{
+ const t=boot({renewable:true,device:{r:'dev-ok',s:Date.UTC(2026,10,20,0,0,0)}});
+ await t.flush();await t.flush();
+ assert.ok(t.calls.some(c=>c[0]==='RENEW'&&c[1]==='dev-ok'),'still verlängert beim Start');
+ assert.match(txt(t.d,'sessionInfo'),/Schicht bis/);
+ assert.equal(t.d.getElementById('loginOverlay').hidden,true);
+ await t.advance(5000);
+ assert.ok(t.calls.some(c=>c[0].includes('demo-orders')&&c[2]&&c[2].startsWith('Bearer tok')),'Bestellungen werden geladen');
+});
+
+test('device key rejected by server (shift over): login required, stored key removed',{skip},async()=>{
+ const t=boot({renewable:true,device:{r:'dev-ok',s:Date.UTC(2026,10,20,0,0,0)},deviceValid:false});
+ await t.flush();await t.flush();await t.advance(20000);
+ assert.match(txt(t.d,'sessionInfo'),/Nicht angemeldet/);
+ assert.equal(t.w.localStorage.getItem('nebu-staff-device'),null);
+ assert.equal(t.calls.filter(c=>c[0].includes('demo-orders')&&c[2]).length,0,'keine Bestelldaten ohne gültige Sitzung');
 });
