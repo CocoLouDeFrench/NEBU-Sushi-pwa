@@ -10,6 +10,9 @@ import pg from 'pg';
 export const env={NEBU_ENV:'test',NEBU_SESSION_SECRET:'test-only-session-secret-0123456789abcdef',NEBU_OWNER_SETUP_CODE:'setup-code-0123456789',NEBU_PRINT_AGENT_TOKEN:'test-only-print-agent-token-abcdefghijklmnopqrstuvwxyz',NEBU_VAPID_PUBLIC:'pub',NEBU_VAPID_PRIVATE:'priv'};
 globalThis.Netlify={env:{get:k=>env[k]}};
 export const pushes=[];
+// Bisheriger Shop-Admin (Blob nebu-sushi-state): im Test steuerbar.
+export const shopAdmin={state:{statusMode:'open',prepTime:'ca. 35 Minuten',soldOut:[]}};
+mock.module('@netlify/blobs',{namedExports:{getStore:()=>({get:async()=>shopAdmin.state,setJSON:async()=>{},set:async()=>{}})}});
 mock.module('web-push',{defaultExport:{setVapidDetails(){},sendNotification:async(sub,payload)=>{pushes.push({endpoint:sub.endpoint,payload:JSON.parse(payload)});if(sub.endpoint.includes('gone'))throw Object.assign(Error('gone'),{statusCode:410})}}});
 mock.module(new URL('../netlify/functions/delivery-check.mjs',import.meta.url).href,{namedExports:{checkAddress:async a=>/außerhalb/.test(a)?{eligible:false,message:'Außerhalb des Liefergebiets'}:{eligible:true,minimum:15,fee:2.5,km:1.2}}});
 
@@ -25,7 +28,7 @@ const migrations=path.join(path.dirname(new URL(import.meta.url).pathname),'../n
 export async function migrate(){for(const f of fs.readdirSync(migrations).sort())await db.query(fs.readFileSync(path.join(migrations,f),'utf8'))}
 export async function reset(){
  await db.query('TRUNCATE nebu_audit, nebu_rate_limits, nebu_push_subscriptions, nebu_settings, nebu_staff_sessions, nebu_staff, nebu_orders CASCADE');
- pushes.length=0;
+ pushes.length=0;shopAdmin.state={statusMode:'open',prepTime:'ca. 35 Minuten',soldOut:[]};
 }
 export async function shutdown(){await db.end();await ep.stop()}
 

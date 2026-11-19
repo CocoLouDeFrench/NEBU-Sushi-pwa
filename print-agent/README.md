@@ -21,3 +21,6 @@ Das Skript erzeugt den Schlüssel `NEBU_PRINT_AGENT_TOKEN` auf dem PC; er wird i
 - Entfernen: `uninstall.ps1`
 
 Drucker-IP fest vergeben (DHCP-Reservierung im Router), sonst `"mode":"windows"` mit Druckernamen verwenden.
+
+## Umstellung auf Live (erst nach Freigabe)
+`3-LIVE-UMSTELLEN.cmd` doppelklicken: sichert die Test-Konfiguration (`config.test-backup.json`), übernimmt die Druckereinstellung, erzeugt einen **neuen Live-Schlüssel** (Zwischenablage) für `NEBU_PRINT_AGENT_TOKEN` im Live-Projekt und verbindet den Dienst mit https://shop.nebusushi.com.

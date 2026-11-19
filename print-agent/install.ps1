@@ -13,7 +13,8 @@ param(
   [string]$PrinterHost = '',
   [string]$PrinterName = '',
   [ValidateSet('tcp','windows')][string]$Mode = 'tcp',
-  [string]$TokenFile = ''
+  [string]$TokenFile = '',
+  [switch]$Live
 )
 $ErrorActionPreference = 'Stop'
 $TaskName = 'NEBU Druckdienst'
@@ -26,7 +27,8 @@ function Step($t){ Write-Host "`n==> $t" -ForegroundColor Yellow }
 
 $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if(-not $admin){ throw 'Bitte PowerShell "Als Administrator ausführen" und das Skript erneut starten.' }
-if($ApiUrl -match 'shop\.nebusushi\.com'){ throw 'Testinstallation: Der Live-Shop ist hier nicht erlaubt.' }
+if($Live){ $ApiUrl = 'https://shop.nebusushi.com' }
+elseif($ApiUrl -match 'shop\.nebusushi\.com'){ throw 'Für den Live-Shop bitte 3-LIVE-UMSTELLEN.cmd verwenden.' }
 
 Step 'Node.js prüfen'
 $node = (Get-Command node.exe -ErrorAction SilentlyContinue).Source
@@ -52,6 +54,16 @@ Step 'Konfiguration'
 New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
 # Nur SYSTEM und Administratoren dürfen Konfiguration (Token), Journal und Protokolle lesen.
 icacls $DataDir /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+# Umstellung Test → Live: alte Konfiguration sichern, Druckereinstellungen übernehmen, neuen Live-Schlüssel erzeugen.
+if($Live -and (Test-Path $Config)){
+  $old = [IO.File]::ReadAllText($Config).TrimStart([char]0xFEFF) | ConvertFrom-Json
+  if($old.apiUrl -notmatch 'shop\.nebusushi\.com'){
+    Copy-Item -Force $Config (Join-Path $DataDir 'config.test-backup.json')
+    if($old.printer.mode -eq 'tcp'){ $Mode='tcp'; $PrinterHost=$old.printer.host } else { $Mode='windows'; $PrinterName=$old.printer.name }
+    Remove-Item -Force $Config
+    Write-Host 'Test-Konfiguration gesichert (config.test-backup.json). Lege Live-Konfiguration an.'
+  }
+}
 if(Test-Path $Config){
   $raw = [IO.File]::ReadAllBytes($Config)
   if($raw.Length -ge 3 -and $raw[0] -eq 0xEF -and $raw[1] -eq 0xBB -and $raw[2] -eq 0xBF){
@@ -73,7 +85,7 @@ if(Test-Path $Config){
     Set-Clipboard -Value $token
     Write-Host ''
     Write-Host 'Neuer Druckdienst-Schlüssel wurde erzeugt und in die Zwischenablage kopiert.' -ForegroundColor Green
-    Write-Host 'Jetzt in Netlify eintragen (nur TESTprojekt nebu-iphone-push-test):'
+    if($Live){ Write-Host 'Jetzt in Netlify eintragen – LIVE-Projekt (shop.nebusushi.com):' -ForegroundColor Yellow } else { Write-Host 'Jetzt in Netlify eintragen (nur TESTprojekt nebu-iphone-push-test):' }
     Write-Host '  Project configuration > Environment variables > Add a variable'
     Write-Host '  Key:   NEBU_PRINT_AGENT_TOKEN'
     Write-Host '  Value: Strg+V  (Option "Contains secret values" anhaken, falls angeboten)'
@@ -82,7 +94,9 @@ if(Test-Path $Config){
   }
   if($token.Length -lt 32){ throw 'Token zu kurz.' }
   $printer = if($Mode -eq 'tcp'){ @{ mode='tcp'; host=$PrinterHost; port=9100 } } else { @{ mode='windows'; name=$PrinterName } }
-  $json = @{ apiUrl=$ApiUrl; token=$token; pollSeconds=5; agentId=$env:COMPUTERNAME; printer=$printer } | ConvertTo-Json -Depth 4
+  $cfg = @{ apiUrl=$ApiUrl; token=$token; pollSeconds=5; agentId=$env:COMPUTERNAME; printer=$printer }
+  if($Live){ $cfg.allowProduction = $true }
+  $json = $cfg | ConvertTo-Json -Depth 4
   # UTF-8 OHNE BOM schreiben (Node.js kann BOM nicht lesen).
   [IO.File]::WriteAllText($Config, $json, (New-Object Text.UTF8Encoding $false))
   Write-Host "Konfiguration geschrieben: $Config (Drucker: $($printer.host)$($printer.name))"

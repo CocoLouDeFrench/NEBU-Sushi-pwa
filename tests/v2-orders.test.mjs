@@ -1,6 +1,6 @@
 import test,{after,before,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
-import {db,env,migrate,reset,shutdown,request,freshIp,pushes} from './pg-harness.mjs';
+import {db,env,migrate,reset,shutdown,request,freshIp,pushes,shopAdmin} from './pg-harness.mjs';
 const {default:login}=await import('../netlify/functions/staff-login.mjs');
 const {default:admin}=await import('../netlify/functions/staff-admin.mjs');
 const {default:staffApi}=await import('../netlify/functions/nebu-orders.mjs');
@@ -167,4 +167,28 @@ test('new staff push device receives new-order notifications; stale endpoints ar
  await place();
  assert.ok(pushes.some(p=>p.endpoint==='https://push.example/kasse'&&/Neue Test-Bestellung/.test(p.payload.title)));
  assert.equal((await db.query("SELECT count(*)::int n FROM nebu_push_subscriptions WHERE endpoint LIKE '%gone'")).rows[0].n,0);
+});
+
+test('old shop admin stays in charge: closed status and sold-out keys are respected',async()=>{
+ shopAdmin.state={statusMode:'closed',prepTime:'ca. 50 Minuten',soldOut:[]};
+ let r=await request(shop,{body:order(),ip:freshIp()});assert.equal(r.status,409);assert.match(r.error,/keine Bestellungen/);
+ const cfg=await request(shop,{body:{action:'config'}});assert.equal(cfg.accepting,false);assert.equal(cfg.prepTime,'ca. 50 Minuten');
+ shopAdmin.state={statusMode:'open',soldOut:['Maki||Maguro Maki']};
+ const {lookup}=await import('../netlify/functions/nebu-catalog.mjs');
+ const key=lookup.get(ITEM).category+'||'+lookup.get(ITEM).name;shopAdmin.state.soldOut=[key];
+ assert.ok((await request(shop,{body:{action:'inventory'}})).disabled.includes(ITEM));
+ assert.equal((await request(shop,{body:order(),ip:freshIp()})).status,409,'im Shop-Admin ausverkauft');
+});
+
+test('opening hours apply live in auto mode (16:00–20:50 Berlin), not in test',async()=>{
+ const {acceptingNow}=await import('../netlify/lib/shop-state.mjs');
+ const at=t=>new Date(t);
+ assert.equal(acceptingNow({statusMode:'auto'},'live',at('2026-11-19T14:59:00Z')).ok,false,'15:59 Berlin');
+ assert.equal(acceptingNow({statusMode:'auto'},'live',at('2026-11-19T15:00:00Z')).ok,true,'16:00');
+ assert.equal(acceptingNow({statusMode:'auto'},'live',at('2026-11-19T19:49:00Z')).ok,true,'20:49');
+ assert.equal(acceptingNow({statusMode:'auto'},'live',at('2026-11-19T19:50:00Z')).ok,false,'20:50');
+ assert.equal(acceptingNow({statusMode:'auto'},'live',at('2026-07-01T18:30:00Z')).ok,true,'Sommerzeit 20:30');
+ assert.equal(acceptingNow({statusMode:'open'},'live',at('2026-11-19T08:00:00Z')).ok,true,'Admin: geöffnet');
+ assert.equal(acceptingNow({statusMode:'closed'},'test').ok,false);
+ assert.equal(acceptingNow({statusMode:'auto'},'test',at('2026-11-19T08:00:00Z')).ok,true);
 });

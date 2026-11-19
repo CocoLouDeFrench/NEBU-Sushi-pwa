@@ -10,13 +10,26 @@ Stand: 2026-11-19. Ziel: Kunden bestellen auf shop.nebusushi.com, das Team nimmt
 - Küchendruck, Doppeldruck-Schutz, Nachdruck bei Druckerausfall, Autostart (Druckdienst 1.2.0) – unverändert übernommen, auf neues Datenmodell portiert.
 - Push-Benachrichtigungen (Team + Kunde), Erinnerung nach 5 Min., automatische Anmeldung pro Schicht.
 
-## Noch zu bauen (nach Entscheidungen unten)
-1. Shop-Seite (Kopie des aktuellen Live-Shops): Bestellen über NEBU statt WhatsApp, **automatischer Rückfall auf WhatsApp**, wenn der Schalter auf WhatsApp steht oder der Server nicht erreichbar ist. Bestell-Button „Zahlungspflichtig bestellen“ (gesetzliche Pflicht bei Online-Bestellungen).
-2. Bestellstatus-Seite für Kunden (aus `customer.html`).
-3. Gewünschte Abholzeit / Vorbestellung in Bestellung, NEBU Control und Küchenbon; Öffnungszeiten serverseitig prüfen.
-4. Build-Skript: Test- und Live-Seiten aus demselben Code, Testseiten nicht live veröffentlichen.
-5. Werkzeug zum Erzeugen der Live-Schlüssel direkt im Browser (Schlüssel verlassen deinen PC nicht).
-6. Release-Branch auf Basis von `main` (nur getestete Teile, aktuelle Shop-Inhalte/SEO bleiben).
+## Entscheidungen des Inhabers (19.11.2026)
+- **Abholzeit:** Das Personal legt sie bei der Annahme fest (30/45/60/75 Min.). Keine Vorbestellung über den Online-Weg.
+- **Lieferung:** Abholung **und** Lieferung ab Start (bis 3 km Fahrstrecke, nicht Altstadt; 2,00 €/Mindestwert 30 € bis 1,5 km, 3,50 €/40 € bis 3 km).
+- **Verwaltung:** Öffnungsstatus, Zubereitungszeit und Ausverkauft bleiben im bisherigen Shop-Admin; NEBU übernimmt sie automatisch. Öffnungszeiten live: 16:00–20:50 Uhr (Status „Automatisch“).
+- **Umstellung:** Bestehendes Live-Projekt wird erweitert, Online-Bestellung startet **aus**.
+
+## Ebenfalls fertig (seit den Entscheidungen)
+- Shop-Erweiterung `shop-addon/nebu-online.js`: ersetzt im Warenkorb den WhatsApp-Teil durch das Online-Formular (Abholung/Lieferung, „Zahlungspflichtig bestellen“), nur wenn der Schalter auf Online steht; bei Serverausfall bleibt WhatsApp.
+- Bestellstatus-Seite `/bestellung.html` (aktualisiert sich automatisch, keine Kontaktdaten).
+- Build-Skript `scripts/build.mjs` + `netlify.toml`: live Shop unter `/`, NEBU Control unter `/control/`, Testseiten nicht veröffentlicht, Sicherheits-Header.
+- Werkzeug `tools/nebu-live-schluessel.html`: erzeugt die Live-Schlüssel im Browser.
+- Druckdienst 1.3.0: `3-LIVE-UMSTELLEN.cmd`.
+- Automatischer Abgleich: alle 76 Shop-Artikel und Preise stimmen mit dem Server-Katalog überein (Test schlägt fehl, falls im Shop ein Preis geändert wird, ohne den Katalog anzupassen).
+
+## Pflichtpunkte vor der Freischaltung (deine Entscheidung / Zuarbeit)
+1. **Impressum und Datenschutzerklärung** auf shop.nebusushi.com (fehlen derzeit komplett). Datenschutz muss Online-Bestellung, Hosting (Netlify), Push-Benachrichtigungen und bei Lieferung die Adressprüfung über OpenStreetMap/OSRM nennen. Texte von dir bzw. Rechtsberatung; ich baue sie ein.
+2. **Löschfrist** festlegen (ggf. Steuerberater) und in NEBU Control einschalten.
+3. **AVV mit Netlify** prüfen/abschließen.
+4. **Adressprüfung für Lieferung:** nutzt die öffentlichen Dienste OpenStreetMap-Nominatim und OSRM-Demo-Server. Für geringe Mengen geeignet, aber ohne Verfügbarkeitszusage. Alternative später: eigener Kartendienst-Schlüssel.
+5. Live-Werte in Netlify eintragen, Datenbank im Live-Projekt aktivieren (Anleitung unten).
 
 ## Live-Konfiguration (getrennt von Test)
 Im Live-Netlify-Projekt (shop.nebusushi.com) eigene Werte – **nie** die Testwerte wiederverwenden:
@@ -38,5 +51,3 @@ Datenbank: Netlify Database im Live-Projekt aktivieren (eigene Datenbank, Migrat
 2. Vollständig: in Netlify das vorherige Live-Deploy wieder veröffentlichen („Publish deploy“) – Rollback-Punkt = aktuelles Live-Deploy vor der Umstellung.
 3. Der Live-Druckdienst kann installiert bleiben; ohne Online-Bestellungen druckt er nichts.
 
-## Entscheidungen des Inhabers
-Siehe Chat / werden hier ergänzt.

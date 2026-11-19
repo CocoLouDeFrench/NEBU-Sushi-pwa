@@ -13,6 +13,8 @@ export const config={
  get vapidPrivate(){return env('NEBU_VAPID_PRIVATE')},
  get vapidContact(){return env('NEBU_VAPID_CONTACT')||'mailto:info@nebusushi.com'},
  // Nur im Testprojekt: Schlüssel für automatisierte Testbestellungen ohne Drosselung.
+ // Wo NEBU Control liegt: live unter /control/, im Testprojekt im Hauptverzeichnis.
+ get controlPath(){return this.environment==='live'?'/control/':'/'},
  get testCustomerKey(){return this.environment==='test'?env('NEBU_TEST_CUSTOMER_KEY'):''}
 };
 

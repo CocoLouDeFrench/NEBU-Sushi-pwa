@@ -4,6 +4,7 @@
 import {lookup} from './nebu-catalog.mjs';
 import {checkAddress} from './delivery-check.mjs';
 import {json,readJson,clientIp,sha256,tx,pool,rateLimited,logError,config,getSetting} from '../lib/core.mjs';
+import {shopState,acceptingNow} from '../lib/shop-state.mjs';
 import {validatePhone,phoneKey,addressKey,newOrderId,newCustomerToken,tokenHash,rowToOrder,customerView,sendPush,staffSubscriptions,envLabel,CUSTOMER_TOKEN_HOURS} from '../lib/orders.mjs';
 
 const ORDER_ID=/^[TN][A-Z0-9]{6,20}$/;
@@ -15,8 +16,9 @@ export default async req=>{
  try{
   switch(body.action){
    case 'config':case 'inventory':{
-    const disabled=await getSetting('disabledProducts');
-    return json({orderingMode:await getSetting('orderingMode'),disabled:Array.isArray(disabled)?disabled:[]},200,{'cache-control':'no-store'});
+    const [mode,state,disabled]=await Promise.all([getSetting('orderingMode'),shopState(),disabledIds()]);
+    const open=acceptingNow(state,config.environment);
+    return json({orderingMode:mode,accepting:mode==='online'&&open.ok,reason:open.ok?null:open.reason,statusMode:state.statusMode,prepTime:state.prepTime,disabled},200,{'cache-control':'no-store'});
    }
    case 'create':return await create(req,body);
    case 'status':return await status(req,body);
@@ -26,6 +28,11 @@ export default async req=>{
  }catch(e){logError('shop-api '+body.action,e);return json({error:'Die Bestellung konnte gerade nicht verarbeitet werden. Bitte erneut versuchen oder telefonisch bestellen.'},500)}
 };
 
+// Ausverkauft = Liste aus NEBU Control ∪ Ausverkauft-Liste des Shop-Admins.
+async function disabledIds(state){
+ const own=await getSetting('disabledProducts');const shop=state||await shopState();
+ return [...new Set([...(Array.isArray(own)?own:[]),...shop.soldOutIds])];
+}
 async function limited(req,name,limits){
  const ip=clientIp(req);if(!ip)return true;
  const key=await sha256(name+':'+ip);
@@ -42,6 +49,9 @@ async function create(req,body){
   if(body.website||body.company)return json({error:'Bestellung konnte nicht verarbeitet werden.'},422);
  }
  if((await getSetting('orderingMode'))!=='online'&&config.environment==='live')return json({error:'Online-Bestellung ist gerade nicht aktiv. Bitte per WhatsApp oder telefonisch bestellen.',orderingMode:'whatsapp'},409);
+ const state=await shopState();
+ const open=acceptingNow(state,config.environment);
+ if(!open.ok)return json({error:open.reason,closed:true},409);
  const injected=PROTECTED.filter(f=>Object.prototype.hasOwnProperty.call(body,f));
  if(injected.length)return json({error:'Manipulierte Bestelldaten: Preis-, Liefer-, Zahlungs- und Statuswerte dürfen nicht vom Kunden vorgegeben werden.'},422);
  const requestId=String(body.requestId||'');if(!/^[0-9a-f]{8}-[0-9a-f-]{27,40}$/i.test(requestId))return json({error:'Ungültige Bestellkennung. Bitte Seite neu laden.'},422);
@@ -49,8 +59,8 @@ async function create(req,body){
  const email=String(body.email||'').trim();if(email&&(email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))return json({error:'Bitte eine gültige E-Mail-Adresse eingeben oder das Feld leer lassen.'},422);
  const phone=String(body.phone||'').trim();const phoneError=validatePhone(phone);if(phoneError)return json({error:phoneError},422);
  const requested=body.cart;if(!Array.isArray(requested)||!requested.length||requested.length>76)return json({error:'Bitte mindestens einen gültigen Artikel auswählen.'},422);
- const disabled=await getSetting('disabledProducts');
- if(requested.some(l=>Array.isArray(disabled)&&disabled.includes(l?.id)))return json({error:'Ein Artikel im Warenkorb ist inzwischen ausverkauft. Bitte Warenkorb aktualisieren.'},409);
+ const disabled=await disabledIds(state);
+ if(requested.some(l=>disabled.includes(l?.id)))return json({error:'Ein Artikel im Warenkorb ist inzwischen ausverkauft. Bitte Warenkorb aktualisieren.'},409);
  const seen=new Set();let subtotalCents=0;const items=[];
  for(const line of requested){
   if(!line||typeof line!=='object'||Object.keys(line).some(k=>!['id','qty'].includes(k)))return json({error:'Ungültige Warenkorb-Daten'},422);
@@ -100,7 +110,7 @@ async function create(req,body){
  let push='not-registered';
  try{
   const subs=await staffSubscriptions();
-  if(subs.length){const r=await sendPush(subs,{title:'NEBU – Neue '+envLabel()+'Bestellung '+o.id,body:o.total.toFixed(2).replace('.',',')+' € · '+(fulfillment==='pickup'?'Abholung':'Lieferung')+' · Jetzt annehmen oder ablehnen',url:'/',tag:'nebu-order-'+o.id});push=r.sent?'sent':'failed'}
+  if(subs.length){const r=await sendPush(subs,{title:'NEBU – Neue '+envLabel()+'Bestellung '+o.id,body:o.total.toFixed(2).replace('.',',')+' € · '+(fulfillment==='pickup'?'Abholung':'Lieferung')+' · Jetzt annehmen oder ablehnen',url:config.controlPath,tag:'nebu-order-'+o.id});push=r.sent?'sent':'failed'}
  }catch(e){logError('order push',e);push='failed'}
  return json({order:customerView(o),token,push},201);
 }

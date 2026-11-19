@@ -1,7 +1,7 @@
 // Mitarbeiter-API für NEBU Control (nur mit persönlicher Anmeldung).
 // GET: offene Bestellungen + abgeschlossene der letzten 24 Std. · POST update / inventory-update.
 import {lookup} from './nebu-catalog.mjs';
-import {json,readJson,tx,pool,audit,logError,getSetting,setSetting} from '../lib/core.mjs';
+import {json,readJson,tx,pool,audit,logError,getSetting,setSetting,config} from '../lib/core.mjs';
 import {requireStaff} from '../lib/auth.mjs';
 import {rowToOrder,staffView,applyStaffUpdate,orderColumns,sendPush,CUSTOMER_MESSAGES,FINAL_STATES} from '../lib/orders.mjs';
 
@@ -13,7 +13,7 @@ export default async req=>{
  try{
   if(req.method==='GET'){
    const r=await pool().query("SELECT * FROM nebu_orders WHERE closed_at IS NULL OR closed_at > now() - interval '24 hours' ORDER BY created_at DESC LIMIT 500");
-   return json({orders:r.rows.map(rowToOrder).map(staffView),printAgent:await getSetting('printAgent').catch(()=>null)||null,me:auth.staff});
+   return json({orders:r.rows.map(rowToOrder).map(staffView),printAgent:await getSetting('printAgent').catch(()=>null)||null,me:auth.staff,environment:config.environment});
   }
   const {body,error}=await readJson(req);if(error)return error;
   if(body.action==='inventory-update'){
@@ -45,7 +45,7 @@ export default async req=>{
    try{
     const subs=(await pool().query("SELECT endpoint,subscription FROM nebu_push_subscriptions WHERE kind='customer' AND order_id=$1",[o.id])).rows;
     const m=CUSTOMER_MESSAGES(o)[o.status];
-    if(m&&subs.length)await sendPush(subs,{title:'NEBU Sushi · '+m[0],body:m[1],url:'/customer.html',tag:'nebu-customer-'+o.id+'-'+o.status},{ttl:180,urgency:'normal'});
+    if(m&&subs.length)await sendPush(subs,{title:'NEBU Sushi · '+m[0],body:m[1],url:'/bestellung.html',tag:'nebu-customer-'+o.id+'-'+o.status},{ttl:180,urgency:'normal'});
     if(FINAL_STATES.includes(o.status))await pool().query("DELETE FROM nebu_push_subscriptions WHERE kind='customer' AND order_id=$1",[o.id]);
    }catch(e){logError('customer push',e)}
   }

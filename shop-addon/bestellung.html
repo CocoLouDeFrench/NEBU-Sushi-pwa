@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Deine Bestellung · NEBU Sushi</title>
+<style>
+:root{--bg:#0f0f0f;--card:#181818;--border:#2b2b2b;--gold:#f6c700;--text:#f2f2f2;--muted:#a6a6a6;--danger:#ff6b6b;--ok:#25d366}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:560px;margin:0 auto;padding:24px 16px 48px}a{color:var(--gold)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin:16px 0}
+h1{font-size:24px;margin:8px 0}.muted{color:var(--muted);font-size:14px}.big{font-size:20px;font-weight:800}
+.steps{list-style:none;padding:0;margin:12px 0}.steps li{padding:8px 0 8px 30px;position:relative;color:var(--muted)}
+.steps li::before{content:'';position:absolute;left:6px;top:14px;width:12px;height:12px;border-radius:50%;border:2px solid var(--border)}
+.steps li.done{color:var(--text)}.steps li.done::before{background:var(--gold);border-color:var(--gold)}
+.steps li.now{color:var(--text);font-weight:800}.steps li.now::before{background:var(--ok);border-color:var(--ok)}
+.bad{border-color:var(--danger);color:#ffb3b3}table{width:100%;border-collapse:collapse}td{padding:4px 0}td:last-child{text-align:right}
+</style>
+</head>
+<body>
+<main>
+<a href="/">← Zurück zum Shop</a>
+<h1>Deine Bestellung</h1>
+<div id="root" class="card"><p class="muted">Lade Bestellstatus …</p></div>
+<p class="muted">Fragen zur Bestellung? Ruf uns gerne an oder komm vorbei: Derendorfer Straße 9, 40479 Düsseldorf.</p>
+</main>
+<script>
+(()=>{'use strict';
+const root=document.getElementById('root');
+const h=(tag,props={},...kids)=>{const e=document.createElement(tag);for(const [k,v] of Object.entries(props))e[k]=v;for(const c of kids.flat())if(c!=null)e.append(c instanceof Node?c:document.createTextNode(String(c)));return e};
+const euro=n=>Number(n||0).toFixed(2).replace('.',',')+' €';
+const time=v=>v?new Date(v).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'';
+let saved=null;try{saved=JSON.parse(localStorage.getItem('nebu-order')||'null')}catch{}
+if(!saved||!saved.id||!saved.token){root.replaceChildren(h('p',{},'Auf diesem Gerät ist keine aktuelle Bestellung gespeichert.'),h('p',{},h('a',{href:'/'},'Zum Shop')));return}
+let timer=null;
+async function load(){
+ try{
+  const r=await fetch('/.netlify/functions/shop-api',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'status',id:saved.id,token:saved.token})});
+  const d=await r.json().catch(()=>({}));
+  if(r.status===403){root.replaceChildren(h('p',{},'Diese Bestellung kann nicht mehr angezeigt werden (Status-Link abgelaufen).'));try{localStorage.removeItem('nebu-order')}catch{}clearInterval(timer);return}
+  if(!r.ok)throw Error(d.error||'Fehler');
+  render(d.order);
+ }catch(e){const n=root.querySelector('.err')||root.appendChild(h('p',{className:'muted err'}));n.textContent='Verbindung wird erneut versucht …'}
+}
+function render(o){
+ const pickup=o.fulfillment==='pickup';
+ const flow=pickup?[['new','Bestellung eingegangen'],['accepted','Angenommen'],['preparing','Wird zubereitet'],['ready','Abholbereit'],['picked_up','Abgeholt']]:[['new','Bestellung eingegangen'],['accepted','Angenommen'],['preparing','Wird zubereitet'],['ready','Fertig'],['enroute','Fahrer unterwegs'],['delivered','Zugestellt']];
+ const idx=flow.findIndex(([s])=>s===o.status);
+ const parts=[h('p',{className:'muted'},'Bestellnummer'),h('p',{className:'big'},'#'+o.id)];
+ if(o.status==='rejected'){parts.push(h('div',{className:'card bad'},h('p',{className:'big'},'Bestellung leider abgelehnt'),o.cancelReason?h('p',{},'Grund: '+o.cancelReason):null))}
+ else if(o.status==='delivery_failed'){parts.push(h('div',{className:'card bad'},h('p',{className:'big'},'Zustellung nicht abgeschlossen')))}
+ else{
+  if(o.status==='new')parts.push(h('p',{},'Wir haben deine Bestellung erhalten und bestätigen sie gleich. Diese Seite aktualisiert sich automatisch.'));
+  if(o.deliveryDueAt&&!['picked_up','delivered'].includes(o.status))parts.push(h('p',{className:'big'},(pickup?'Abholbereit ca. ':'Lieferung ca. ')+time(o.deliveryDueAt)+' Uhr'));
+  parts.push(h('ul',{className:'steps'},flow.map(([s,label],i)=>h('li',{className:i<idx?'done':i===idx?'now':''},label))));
+ }
+ parts.push(h('table',{},(o.items||[]).map(i=>h('tr',{},h('td',{},i.qty+'× '+i.name),h('td',{},euro(i.price*i.qty)))),o.fee?h('tr',{},h('td',{},'Liefergebühr'),h('td',{},euro(o.fee))):null,h('tr',{},h('td',{},h('strong',{},'Gesamt')),h('td',{},h('strong',{},euro(o.total))))));
+ parts.push(h('p',{className:'muted'},'Bezahlung: bar '+(pickup?'bei Abholung':'beim Fahrer')+'.'));
+ root.replaceChildren(...parts);
+ if(['picked_up','delivered','rejected','delivery_failed'].includes(o.status))clearInterval(timer);
+}
+load();timer=setInterval(load,10000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')load()});
+})();
+</script>
+</body>
+</html>

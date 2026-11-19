@@ -1,5 +1,5 @@
 // Erinnerung per Push, wenn eine neue Bestellung 5 Minuten nicht angenommen wurde (einmal pro Bestellung).
-import {tx,logError} from '../lib/core.mjs';
+import {tx,logError,config as nebuConfig} from '../lib/core.mjs';
 import {sendPush,staffSubscriptions} from '../lib/orders.mjs';
 export const config={schedule:'* * * * *'};
 export default async()=>{
@@ -12,6 +12,6 @@ export default async()=>{
   });
   if(!due)return;
   const subs=await staffSubscriptions();
-  await sendPush(subs,{title:'NEBU · '+due.length+' offene '+(due.length===1?'Bestellung':'Bestellungen'),body:due.length===1?'Bestellung #'+due[0]+' wartet seit mindestens 5 Minuten auf Annahme.':due.length+' Bestellungen warten auf Annahme. Bitte NEBU Control prüfen.',url:'/',tag:'nebu-reminders-summary'},{ttl:180});
+  await sendPush(subs,{title:'NEBU · '+due.length+' offene '+(due.length===1?'Bestellung':'Bestellungen'),body:due.length===1?'Bestellung #'+due[0]+' wartet seit mindestens 5 Minuten auf Annahme.':due.length+' Bestellungen warten auf Annahme. Bitte NEBU Control prüfen.',url:nebuConfig.controlPath,tag:'nebu-reminders-summary'},{ttl:180});
  }catch(e){logError('order-reminders',e)}
 };

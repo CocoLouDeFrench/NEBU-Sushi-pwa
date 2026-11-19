@@ -1,3 +1,5 @@
+# Eine Konfiguration für Test und Live – die Umgebung wählt die Variable NEBU_ENV (live|test) im Netlify-Projekt.
 [build]
-  publish = "push-test"
+  command = "node scripts/build.mjs"
+  publish = "dist"
   functions = "netlify/functions"
