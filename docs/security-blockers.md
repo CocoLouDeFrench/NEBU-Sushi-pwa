@@ -1,26 +1,30 @@
-# NEBU Control: Security blockers (test branch, 2026-11-18)
+# NEBU Bestellsystem – Sicherheits- und Datenschutzpunkte
 
-This is a code-review checklist, **not** a penetration-test certificate. Do not use real customer data in test until resolved.
+Stand: 2026-11-19 (TEST-Branch `test/iphone-push-bestellcenter`). Code-Review-Liste, **kein** Penetrationstest-Zertifikat.
 
-## Confirmed code-level findings
-1. **High: public inventory read** — `demo-orders.mjs` returns disabled product IDs for `action:'inventory'` without staff authentication. This may be intended for customers, but staff and public read APIs must be separated, with a narrow public response.
-2. **High: customer status access relies on bearer token** — `action:'status'` checks `body.token === order.customerToken`. Tokens must never leak via logs, URLs, analytics or third-party scripts. Add token expiry/retention and avoid exposing unnecessary fields.
-3. **High: staff authentication relies on shared static key** — `x-nebu-test-key` and `NEBU_TEST_ADMIN_KEY`. Before production use individual staff authentication/session management, rotation, revocation and rate limiting. Test sessions: 30-min access tokens (memory only) are renewed with a device refresh token stored in localStorage (needed for the iPhone web app), hard limit 12 h after code entry. The access code itself is never stored. There is no server-side revocation yet: a stolen device refresh token works until its 12 h end — individual accounts plus revocation are required before production.
-4. **High: order retention is not time-based** — test code stores up to 100 orders (`orders.slice(0,100)`), not a defined data deletion schedule. Build retention/deletion workflow and document lawful retention needs.
-5. **Medium: non-atomic public rate limiter** — code itself notes its Blobs IP throttle is not production-ready. Add edge/WAF or transactional throttling for production.
-6. **Medium: staff API returns complete orders** — GET returns all stored orders minus customerToken. Limit fields and scope by role; ensure no-store on responses.
-7. **Medium: error handling** — avoid logging raw errors that might contain customer data or external service payloads; sanitize operational logs.
-8. **Medium: request origin/CORS/CSRF and security headers** — verify exact deployment configuration, browser storage of admin key, CSP, cookie policy, and dependency vulnerabilities before launch.
+## Befunde vom 2026-11-18 – Status
 
-## Required validation
-- [ ] Unauthorized GET/POST, manipulated prices, malformed JSON and oversized body tested against deployed **test** endpoint.
-- [ ] Public user cannot enumerate orders or retrieve customer data with guessed IDs.
-- [ ] Test staff sessions expire and can be revoked.
-- [ ] Customer status tokens are high entropy, scoped, expiring and not exposed in URLs/logs.
-- [ ] Document Netlify/database/push-provider data processing, DPA/AVV, hosting regions, sub-processors and retention.
-- [ ] Implement automated deletion/anonymization with exception for legally required records.
-- [ ] Test backups, restore, incident response and credential rotation.
-- [ ] Independent security review and GDPR legal review before real-customer launch.
+| # | Befund | Status | Umsetzung |
+|---|---|---|---|
+| 1 | Öffentliche Abfragen und Mitarbeiter-API vermischt | **behoben** | Getrennte Funktionen: `shop-api` (öffentlich: Bestellweg, Ausverkauft-Liste, Bestellung aufgeben, eigene Bestellung per Token) und `nebu-orders` (nur angemeldete Mitarbeiter). `demo-orders` leitet nur noch weiter. |
+| 2 | Kunden-Status-Token | **behoben** | 256-Bit-Zufallstoken, in der Datenbank nur als SHA-256-Hash, gültig 48 Std., nie in URLs; Kundensicht ohne Kontaktdaten, Zahlungs- und Prüfprotokolle. |
+| 3 | Gemeinsamer Mitarbeiter-Code | **behoben** | Persönliche Zugänge (Name + PIN, PBKDF2-SHA256 mit 210.000 Runden), Rollen Inhaber/Mitarbeiter, Sperre nach 5 falschen PINs (15 Min.), serverseitige Sitzungen: jede Anfrage prüft die Sitzung in der Datenbank → Gerät abmelden, PIN ändern oder Zugang deaktivieren wirkt **sofort**. Schicht max. 12 Std. Änderungsprotokoll mit Mitarbeitername für alle Bestell-, Zahlungs-, Team- und Einstellungsänderungen. |
+| 4 | Keine Löschfristen, 100-Bestellungen-Grenze | **behoben (Technik)**, Frist = **Inhaber-Entscheidung** | Eine Datenbankzeile pro Bestellung, kein Verlust alter Bestellungen. Anonymisierung abgeschlossener Bestellungen nach einstellbarer Frist (7–365 Tage) – **standardmäßig aus**, Einschalten nur durch den Inhaber in NEBU Control. Beträge, Artikel, Zeiten und Zahlungsprotokoll bleiben erhalten. Technische Bereinigung (abgelaufene Tokens, Push-Abos, Drosselzähler, alte Sitzungen) läuft automatisch. |
+| 5 | Nicht-atomare Drosselung | **behoben** | Zähler in PostgreSQL (`INSERT … ON CONFLICT … RETURNING`), getestet mit parallelen Anfragen. Grenzen live: 6 Bestellungen / 15 Min. und 30 / Tag pro IP; Anmeldung 20 / 15 Min. pro IP. |
+| 6 | Mitarbeiter-API liefert alle Bestellungen | **behoben** | Nur offene Bestellungen + abgeschlossene der letzten 24 Std. (max. 500). |
+| 7 | Fehlerprotokolle | **behoben** | Zentrale Protokollierung ohne Anfrageinhalte; E-Mail-Adressen und Telefonnummern werden vor dem Schreiben maskiert. |
+| 8 | CORS/CSRF/Header | **erledigt, mit Rest** | Kein CORS freigegeben (nur gleiche Herkunft). Anmeldung über `Authorization`-Header statt Cookies → kein CSRF-Angriffsweg. CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy gesetzt. **Rest:** Seiten nutzen Inline-Skripte, daher `script-src 'unsafe-inline'`; Schutz vor eingeschleustem Code beruht auf konsequenter `textContent`-Ausgabe. |
 
-## Release rule
-No production write integration or real customer order handling until all high findings have been resolved and verified.
+## Weitere Maßnahmen
+- Druckdienst: eigener Token je Umgebung; der Druckdienst sieht nur Bestellnummer, Name, Artikel, Sonderwünsche und Zeiten (keine Telefonnummer/Adresse). Steuerzeichen aus Kundentexten werden vor dem Druck entfernt.
+- Live-Umgebung ignoriert alle Test-Schlüssel (`NEBU_TEST_*`); Online-Bestellung ist live **aus**, bis der Inhaber sie einschaltet.
+- Doppelte Bestellnummern bei gleichzeitigen Bestellungen ausgeschlossen (gefunden und behoben beim Lasttest).
+
+## Offen / nicht durch Code lösbar
+- [ ] Unabhängige Sicherheitsprüfung und rechtliche Datenschutzprüfung vor Echtbetrieb (empfohlen).
+- [ ] Auftragsverarbeitungsvertrag (AVV) mit Netlify (Hosting, Datenbank) prüfen/abschließen; Datenschutzerklärung ergänzen (Bestelldaten, Push-Benachrichtigungen, ggf. OpenStreetMap-Adressprüfung bei Lieferung).
+- [ ] Löschfrist festlegen (ggf. mit Steuerberater) und in NEBU Control einschalten.
+- [ ] Backups/Wiederherstellung der Live-Datenbank testen; Notfallablauf „zurück zu WhatsApp“ einmal üben.
+
+## Tests
+`npm i --no-save embedded-postgres pg jsdom@24` und dann `node --test --experimental-test-module-mocks tests/`. Die Server-Tests laufen gegen eine echte PostgreSQL-Datenbank (Parallelität, Sperren, Drosselung).

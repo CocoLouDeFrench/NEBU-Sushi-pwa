@@ -18,10 +18,11 @@ function boot({loginOk=true,renewable=false,device=null,deviceValid=true}={}){
   w.fetch=async(url,init={})=>{url=String(url);const b=init.body?JSON.parse(init.body):null;calls.push([url,b&&b.action||init.method||'GET',(init.headers||{}).authorization||null]);
    const res=(st,obj)=>new w.Response(JSON.stringify(obj),{status:st,headers:{'content-type':'application/json'}});
    const ends=new Date(Date.UTC(2026,10,20,0,0,0)).toISOString();
-   if(url.endsWith('staff-login')&&renewable&&b&&b.renew){calls.push(['RENEW',b.refreshToken||null]);if(b.refreshToken)return b.refreshToken==='dev-ok'&&deviceValid?res(200,{token:'tok'+now,expiresInSeconds:1800,refreshToken:'dev-ok',sessionEndsAt:ends}):res(403,{error:'Sitzung abgelaufen'});return res(403,{error:'Sitzung abgelaufen'})}
-   if(url.endsWith('staff-login')&&renewable&&b.key==='richtig')return res(200,{token:'tok'+now,expiresInSeconds:1800,refreshToken:'dev-ok',sessionEndsAt:ends});
-   if(url.endsWith('staff-login'))return loginOk&&b.key==='richtig'?res(200,{token:'tok'+now,expiresInSeconds:1800}):res(403,{error:'Zugang verweigert'});
-   if(url.includes('demo-orders')){if(serverRejects)return res(403,{error:'Nur für NEBU-Mitarbeiter'});
+   if(url.endsWith('staff-login')&&renewable&&b&&b.action==='renew'){calls.push(['RENEW',b.refreshToken||null]);if(b.refreshToken)return b.refreshToken==='dev-ok'&&deviceValid?res(200,{token:'tok'+now,expiresInSeconds:1800,refreshToken:'dev-ok',sessionEndsAt:ends}):res(403,{error:'Sitzung abgelaufen'});return res(403,{error:'Sitzung abgelaufen'})}
+   if(url.endsWith('staff-login')&&b&&b.action==='logout'){calls.push(['LOGOUT',b.refreshToken]);return res(200,{ok:true})}
+   if(url.endsWith('staff-login')&&renewable&&b.action==='login'&&b.pin==='richtig')return res(200,{token:'tok'+now,expiresInSeconds:1800,refreshToken:'dev-ok',sessionEndsAt:ends,staff:{name:b.name,role:'owner'}});
+   if(url.endsWith('staff-login'))return loginOk&&b.action==='login'&&b.pin==='richtig'&&b.name==='Mia'?res(200,{token:'tok'+now,expiresInSeconds:1800,staff:{name:'Mia',role:'staff'}}):res(403,{error:'Name oder PIN falsch.'});
+   if(url.includes('nebu-orders')||url.includes('shop-api')){if(serverRejects)return res(403,{error:'Nur für NEBU-Mitarbeiter'});
     if(!init.method||init.method==='GET')return res(200,{orders});
     if(b.action==='inventory')return res(200,{disabled:[]});
     if(b.action==='update'){const o=orders.find(x=>x.id===b.id);calls.push(['UPDATE',b]);if(b.paymentReceived===false&&!b.paymentReason)return res(422,{error:'Begründung fehlt'});Object.assign(o,{paymentReceived:b.paymentReceived,version:o.version+1});return res(200,{order:o})}}
@@ -32,7 +33,7 @@ function boot({loginOk=true,renewable=false,device=null,deviceValid=true}={}){
  const w=dom.window,d=w.document;
  const advance=async ms=>{const end=now+ms;while(true){const t=timers.filter(t=>t.next<=end).sort((a,b)=>a.next-b.next)[0];if(!t)break;now=t.next;t.next+=t.ms;await t.fn();await new Promise(r=>setImmediate(r))}now=end;await new Promise(r=>setImmediate(r))};
  const flush=()=>new Promise(r=>setTimeout(r,20));
- const login=async key=>{d.getElementById('loginKey').value=key;d.getElementById('loginForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await flush();await flush()};
+ const login=async key=>{d.getElementById('loginName').value='Mia';d.getElementById('loginKey').value=key;d.getElementById('loginForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await flush();await flush()};
  return {w,d,calls,advance,flush,login,setReject:v=>serverRejects=v,prompts,setConfirm:v=>confirms=v,orders};
 }
 const txt=(d,id)=>d.getElementById(id).textContent;
@@ -40,18 +41,18 @@ const txt=(d,id)=>d.getElementById(id).textContent;
 test('initial state: not logged in, no order data shown, no polling',{skip},async()=>{
  const t=boot();await t.flush();
  assert.match(txt(t.d,'sessionInfo'),/Nicht angemeldet/);assert.match(txt(t.d,'remoteorders'),/Bitte anmelden/);
- await t.advance(10000);assert.equal(t.calls.filter(c=>c[0].includes('demo-orders')).length,0);
+ await t.advance(10000);assert.equal(t.calls.filter(c=>c[0].includes('nebu-orders')).length,0);
 });
 test('login, countdown, auto-polling with bearer token',{skip},async()=>{
  const t=boot();t.d.getElementById('sessionButton').click();assert.equal(t.d.getElementById('loginOverlay').hidden,false);
  await t.login('richtig');
  assert.equal(t.d.getElementById('loginOverlay').hidden,true);assert.match(txt(t.d,'sessionInfo'),/Angemeldet · noch 30 Min/);
- assert.match(txt(t.d,'remoteorders'),/T1|Anna/);assert.equal(t.d.getElementById('loginKey').value,'');assert.equal(t.d.getElementById('testkey').value,'');
- const before=t.calls.length;await t.advance(10000);assert.ok(t.calls.slice(before).some(c=>c[0].includes('demo-orders')&&c[2]==='Bearer tok'+Date.UTC(2026,10,19,12,0,0)));
+ assert.match(txt(t.d,'remoteorders'),/T1|Anna/);assert.equal(t.d.getElementById('teamButton').hidden,true,'Mitarbeiter sieht keinen Team-Bereich');assert.equal(t.d.getElementById('loginKey').value,'');assert.equal(t.d.getElementById('testkey').value,'');
+ const before=t.calls.length;await t.advance(10000);assert.ok(t.calls.slice(before).some(c=>c[0].includes('nebu-orders')&&c[2]==='Bearer tok'+Date.UTC(2026,10,19,12,0,0)));
 });
 test('wrong code shows error, no session',{skip},async()=>{
  const t=boot();t.d.getElementById('sessionButton').click();await t.login('falsch');
- assert.equal(t.d.getElementById('loginError').hidden,false);assert.match(txt(t.d,'loginError'),/Zugang verweigert/);assert.match(txt(t.d,'sessionInfo'),/Nicht angemeldet/);
+ assert.equal(t.d.getElementById('loginError').hidden,false);assert.match(txt(t.d,'loginError'),/Name oder PIN falsch/);assert.match(txt(t.d,'sessionInfo'),/Nicht angemeldet/);
 });
 test('warning 5 min before expiry, then expiry clears data and opens login; re-login extends',{skip},async()=>{
  const t=boot();t.d.getElementById('sessionButton').click();await t.login('richtig');
@@ -60,7 +61,7 @@ test('warning 5 min before expiry, then expiry clears data and opens login; re-l
  await t.advance(5*60000);
  assert.match(txt(t.d,'sessionInfo'),/Nicht angemeldet/);assert.ok(t.d.getElementById('sessionBanner').classList.contains('expired'));
  assert.equal(t.d.getElementById('loginOverlay').hidden,false);assert.doesNotMatch(txt(t.d,'remoteorders'),/Anna|Ben/);
- const n=t.calls.length;await t.advance(30000);assert.equal(t.calls.slice(n).filter(c=>c[0].includes('demo-orders')).length,0,'no polling after expiry');
+ const n=t.calls.length;await t.advance(30000);assert.equal(t.calls.slice(n).filter(c=>c[0].includes('nebu-orders')).length,0,'no polling after expiry');
  await t.login('richtig');assert.match(txt(t.d,'sessionInfo'),/noch 30 Min/);assert.equal(t.d.getElementById('sessionBanner').hidden,true);assert.match(txt(t.d,'remoteorders'),/Anna/);
 });
 test('renew early from warning banner keeps working',{skip},async()=>{
@@ -72,13 +73,13 @@ test('logout clears token and data immediately',{skip},async()=>{
  const t=boot();t.d.getElementById('sessionButton').click();await t.login('richtig');
  t.d.getElementById('sessionButton').click();await t.flush();
  assert.match(txt(t.d,'sessionInfo'),/Nicht angemeldet/);assert.match(txt(t.d,'remoteorders'),/Abgemeldet/);
- const n=t.calls.length;await t.advance(20000);assert.equal(t.calls.slice(n).filter(c=>c[0].includes('demo-orders')).length,0);
+ const n=t.calls.length;await t.advance(20000);assert.equal(t.calls.slice(n).filter(c=>c[0].includes('nebu-orders')).length,0);
 });
 test('server rejecting the session ends it locally (no stale token reuse)',{skip},async()=>{
  const t=boot();t.d.getElementById('sessionButton').click();await t.login('richtig');
  t.setReject(true);await t.advance(5000);
  assert.match(txt(t.d,'sessionInfo'),/Nicht angemeldet/);assert.match(txt(t.d,'sessionBannerText'),/Server hat die Sitzung abgelehnt/);assert.doesNotMatch(txt(t.d,'remoteorders'),/Anna/);
- const n=t.calls.length;await t.advance(20000);assert.equal(t.calls.slice(n).filter(c=>c[0].includes('demo-orders')).length,0);
+ const n=t.calls.length;await t.advance(20000);assert.equal(t.calls.slice(n).filter(c=>c[0].includes('nebu-orders')).length,0);
 });
 test('payment UI: locked on new order; reversal asks for reason and sends it',{skip},async()=>{
  const t=boot();t.d.getElementById('sessionButton').click();await t.login('richtig');
@@ -101,17 +102,19 @@ test('payment log appears in order details',{skip},async()=>{
 test('session renews itself in the background until shift end – no repeated login',{skip},async()=>{
  const t=boot({renewable:true});t.d.getElementById('sessionButton').click();await t.login('richtig');
  assert.match(txt(t.d,'sessionInfo'),/Schicht bis/);
+ assert.equal(t.d.getElementById('teamButton').hidden,false,'Inhaber sieht Team-Bereich');
  await t.advance(2*60*60*1000); // 2 Stunden aktiv
- assert.match(txt(t.d,'sessionInfo'),/Angemeldet/);
+ assert.match(txt(t.d,'sessionInfo'),/Mia · Schicht bis/);
  assert.equal(t.d.getElementById('loginOverlay').hidden,true,'kein erneutes Anmelden');
  const renewals=t.calls.filter(c=>c[0]==='RENEW');
  assert.ok(renewals.length>=4,'Token wurde mehrfach verlängert');
- const last=t.calls.filter(c=>c[0].includes('demo-orders')).at(-1);
+ const last=t.calls.filter(c=>c[0].includes('nebu-orders')).at(-1);
  assert.notEqual(last[2],'Bearer tok'+Date.UTC(2026,10,19,12,0,0),'neuer Token in Benutzung');
  const saved=JSON.parse(t.w.localStorage.getItem('nebu-staff-device'));assert.equal(saved.r,'dev-ok','Geräte-Schlüssel gespeichert');
  assert.ok(!t.w.localStorage.getItem('nebu-staff-device').includes('richtig'),'Zugangscode wird nie gespeichert');
  t.d.getElementById('sessionButton').click();
  assert.equal(t.w.localStorage.getItem('nebu-staff-device'),null,'Abmelden löscht gespeicherte Anmeldung');
+ await t.flush();assert.ok(t.calls.some(c=>c[0]==='LOGOUT'&&c[1]==='dev-ok'),'Server-Sitzung wird beim Abmelden gesperrt');
 });
 
 test('iPhone web app reopened (new page, empty memory): session is restored without login',{skip},async()=>{
@@ -121,7 +124,7 @@ test('iPhone web app reopened (new page, empty memory): session is restored with
  assert.match(txt(t.d,'sessionInfo'),/Schicht bis/);
  assert.equal(t.d.getElementById('loginOverlay').hidden,true);
  await t.advance(5000);
- assert.ok(t.calls.some(c=>c[0].includes('demo-orders')&&c[2]&&c[2].startsWith('Bearer tok')),'Bestellungen werden geladen');
+ assert.ok(t.calls.some(c=>c[0].includes('nebu-orders')&&c[2]&&c[2].startsWith('Bearer tok')),'Bestellungen werden geladen');
 });
 
 test('device key rejected by server (shift over): login required, stored key removed',{skip},async()=>{
@@ -129,5 +132,5 @@ test('device key rejected by server (shift over): login required, stored key rem
  await t.flush();await t.flush();await t.advance(20000);
  assert.match(txt(t.d,'sessionInfo'),/Nicht angemeldet/);
  assert.equal(t.w.localStorage.getItem('nebu-staff-device'),null);
- assert.equal(t.calls.filter(c=>c[0].includes('demo-orders')&&c[2]).length,0,'keine Bestelldaten ohne gültige Sitzung');
+ assert.equal(t.calls.filter(c=>c[0].includes('nebu-orders')&&c[2]).length,0,'keine Bestelldaten ohne gültige Sitzung');
 });

@@ -1,49 +1,51 @@
-import {getStore} from '@netlify/blobs';
-import {issueStaffSession,verifyStaffSession,issueRefreshToken,verifyRefreshToken,SHIFT_SECONDS} from './nebu-staff-session.mjs';
-const tokenExp=token=>JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(token.split('.')[0].replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)))).exp;
-const session=async(secret,auth,refreshToken)=>{const token=await issueStaffSession(secret,{authTime:auth});return {token,expiresInSeconds:tokenExp(token)-Math.floor(Date.now()/1000),refreshToken,sessionEndsAt:new Date((auth+SHIFT_SECONDS)*1000).toISOString()}};
-const reply=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store, private','pragma':'no-cache','x-content-type-options':'nosniff','referrer-policy':'no-referrer'}});
-const digest=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))).map(x=>x.toString(16).padStart(2,'0')).join('');
+// Anmeldung, Verlängerung und Abmeldung für persönliche Mitarbeiterzugänge.
+import {json,readJson,clientIp,sha256,tx,pool,rateLimited,audit,logError,config} from '../lib/core.mjs';
+import {nameKey,checkPin,dummyCheck,issueTokens,readToken,loadSession,SHIFT_SECONDS} from '../lib/auth.mjs';
+
+const FAIL_LIMIT=5,LOCK_MINUTES=15;
+const generic=()=>json({error:'Name oder PIN falsch.'},403);
+
 export default async req=>{
- if(req.method!=='POST')return reply({error:'Methode nicht erlaubt'},405);
- const secret=Netlify.env.get('NEBU_TEST_SESSION_SECRET');
- const adminKey=Netlify.env.get('NEBU_TEST_ADMIN_KEY');
- if(!secret||secret.length<32||!adminKey)return reply({error:'Sitzungsanmeldung noch nicht konfiguriert'},503);
- // Verlängerung ohne Code: per Geräte-Schlüssel (refreshToken, auch nach App-Neustart) oder per noch gültiger Sitzung.
- // Beides endet fest 12 Std. nach der Code-Eingabe.
- const bearer=req.headers.get('authorization')||'';
- const peek=req.clone();let renewBody=null;try{const raw=await peek.text();if(raw.length<=4096)renewBody=JSON.parse(raw)}catch{}
- if(renewBody&&renewBody.renew===true){
-  if(typeof renewBody.refreshToken==='string'){
-   const r=await verifyRefreshToken(renewBody.refreshToken,secret);
-   if(!r)return reply({error:'Sitzung abgelaufen'},403);
-   return reply(await session(secret,r.auth,renewBody.refreshToken));
-  }
-  if(bearer.startsWith('Bearer ')){
-   const current=await verifyStaffSession(bearer.slice(7),secret);
-   if(!current)return reply({error:'Sitzung abgelaufen'},403);
-   return reply(await session(secret,current.auth,await issueRefreshToken(secret,current.auth)));
-  }
-  return reply({error:'Sitzung abgelaufen'},403);
- }
- const ip=req.headers.get('x-nf-client-connection-ip');
- if(!ip)return reply({error:'Anmeldung derzeit nicht verfügbar'},503);
- // Test-only best-effort throttle. Netlify Blobs read/modify/write is NOT atomic.
- // Must be replaced with transactional/edge rate limiting before production.
- const store=getStore('nebu-test-login-limits');
- const bucket='login-'+await digest(ip+'|'+secret);
- let attempts;
+ if(req.method!=='POST')return json({error:'Methode nicht erlaubt'},405);
+ if(!config.sessionSecret||config.sessionSecret.length<32)return json({error:'Anmeldung noch nicht eingerichtet'},503);
+ const {body,error}=await readJson(req,4096);if(error)return error;
  try{
-  const now=Date.now();
-  const saved=await store.get(bucket,{type:'json'});
-  attempts=(Array.isArray(saved)?saved:[]).filter(t=>Number.isFinite(t)&&t<=now&&now-t<15*60*1000);
-  if(attempts.length>=5)return reply({error:'Zu viele Anmeldeversuche. Bitte in 15 Minuten erneut versuchen.'},429);
- }catch{return reply({error:'Anmeldung vorübergehend nicht verfügbar'},503)}
- let body;try{const raw=await req.text();if(raw.length>2048)return reply({error:'Anfrage zu groß'},413);body=JSON.parse(raw)}catch{return reply({error:'Ungültige Anfrage'},400)}
- if(!body||typeof body.key!=='string'||body.key.length>256||body.key!==adminKey){
-  try{await store.setJSON(bucket,[...attempts,Date.now()])}catch{return reply({error:'Anmeldung vorübergehend nicht verfügbar'},503)}
-  return reply({error:'Zugang verweigert'},403);
- }
- const auth=Math.floor(Date.now()/1000);
- return reply(await session(secret,auth,await issueRefreshToken(secret,auth)));
+  if(body.action==='renew'){
+   const d=await readToken(body.refreshToken,'refresh');
+   const s=d?await loadSession(d.sid):null;
+   if(!s||s.staff_id!==d.uid)return json({error:'Sitzung abgelaufen'},403);
+   return json(await issueTokens({id:s.id,expires_at:s.expires_at},{id:s.staff_id,name:s.name,role:s.role}));
+  }
+  if(body.action==='logout'){
+   const d=await readToken(body.refreshToken,'refresh');
+   if(d)await tx(async db=>{const r=await db.query("UPDATE nebu_staff_sessions SET revoked_at=now(), revoked_reason='Abmeldung' WHERE id=$1 AND revoked_at IS NULL RETURNING staff_id",[d.sid]);if(r.rows[0])await audit(db,{staff:{id:r.rows[0].staff_id},action:'logout'})});
+   return json({ok:true});
+  }
+  if(body.action!=='login'&&body.key!==undefined)return json({error:'Bitte mit Name und PIN anmelden.'},400);
+  if(body.action!=='login')return json({error:'Ungültige Aktion'},400);
+  const ip=clientIp(req);
+  if(!ip)return json({error:'Anmeldung derzeit nicht verfügbar'},503);
+  if(typeof body.name!=='string'||typeof body.pin!=='string'||body.name.length>60||body.pin.length>20)return generic();
+  if(await rateLimited('login-ip:'+await sha256(ip),{limit:20,windowSeconds:900}))return json({error:'Zu viele Anmeldeversuche. Bitte in 15 Minuten erneut versuchen.'},429);
+  const device=String(body.device||'').replace(/[^\p{L}\p{N} .,()/-]/gu,'').slice(0,60)||null;
+  const r=await pool().query('SELECT id,name,role,pin_hash,active,failed_attempts,locked_until FROM nebu_staff WHERE name_key=$1',[nameKey(body.name)]);
+  const st=r.rows[0];
+  if(!st||!st.active){await dummyCheck(body.pin);return generic()}
+  if(st.locked_until&&new Date(st.locked_until)>new Date())return json({error:'Zu viele falsche PINs. Zugang für '+LOCK_MINUTES+' Minuten gesperrt.'},429);
+  if(!await checkPin(body.pin,st.pin_hash)){
+   await tx(async db=>{
+    const u=await db.query("UPDATE nebu_staff SET failed_attempts=failed_attempts+1, locked_until=CASE WHEN failed_attempts+1>=$2 THEN now()+($3||' minutes')::interval ELSE locked_until END WHERE id=$1 RETURNING failed_attempts",[st.id,FAIL_LIMIT,String(LOCK_MINUTES)]);
+    await audit(db,{staff:{id:st.id,name:st.name},action:'login_failed',detail:{attempts:u.rows[0].failed_attempts}});
+    if(u.rows[0].failed_attempts>=FAIL_LIMIT)await db.query('UPDATE nebu_staff SET failed_attempts=0 WHERE id=$1',[st.id]);
+   });
+   return generic();
+  }
+  const session=await tx(async db=>{
+   await db.query('UPDATE nebu_staff SET failed_attempts=0, locked_until=NULL WHERE id=$1',[st.id]);
+   const s=await db.query("INSERT INTO nebu_staff_sessions (staff_id, expires_at, device, last_seen_at) VALUES ($1, now()+($2||' seconds')::interval, $3, now()) RETURNING id, expires_at",[st.id,String(SHIFT_SECONDS),device]);
+   await audit(db,{staff:st,action:'login',detail:{device}});
+   return s.rows[0];
+  });
+  return json(await issueTokens(session,st));
+ }catch(e){logError('staff-login',e);return json({error:'Anmeldung vorübergehend nicht verfügbar'},503)}
 };
