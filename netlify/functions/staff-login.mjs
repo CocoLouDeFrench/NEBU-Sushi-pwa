@@ -25,11 +25,16 @@ export default async req=>{
   if(body.action!=='login')return json({error:'Ungültige Aktion'},400);
   const ip=clientIp(req);
   if(!ip)return json({error:'Anmeldung derzeit nicht verfügbar'},503);
-  if(typeof body.name!=='string'||typeof body.pin!=='string'||body.name.length>60||body.pin.length>20)return generic();
+  if(typeof body.pin!=='string'||body.pin.length>20)return generic();
+  // Ein-Code-Anmeldung nur für genau einen aktiven Inhaber. Keine PIN-Suche über Mitarbeiterkonten.
+  const codeOnly=body.codeOnly===true;
+  if(!codeOnly&&(typeof body.name!=='string'||body.name.length>60))return generic();
   if(await rateLimited('login-ip:'+await sha256(ip),{limit:20,windowSeconds:900}))return json({error:'Zu viele Anmeldeversuche. Bitte in 15 Minuten erneut versuchen.'},429);
   const device=String(body.device||'').replace(/[^\p{L}\p{N} .,()/-]/gu,'').slice(0,60)||null;
-  const r=await pool().query('SELECT id,name,role,pin_hash,active,failed_attempts,locked_until FROM nebu_staff WHERE name_key=$1',[nameKey(body.name)]);
-  const st=r.rows[0];
+  const r=codeOnly
+   ?await pool().query("SELECT id,name,role,pin_hash,active,failed_attempts,locked_until FROM nebu_staff WHERE role='owner' AND active=true LIMIT 2")
+   :await pool().query('SELECT id,name,role,pin_hash,active,failed_attempts,locked_until FROM nebu_staff WHERE name_key=$1',[nameKey(body.name)]);
+  const st=codeOnly&&r.rows.length!==1?null:r.rows[0];
   if(!st||!st.active){await dummyCheck(body.pin);return generic()}
   if(st.locked_until&&new Date(st.locked_until)>new Date())return json({error:'Zu viele falsche PINs. Zugang für '+LOCK_MINUTES+' Minuten gesperrt.'},429);
   if(!await checkPin(body.pin,st.pin_hash)){
