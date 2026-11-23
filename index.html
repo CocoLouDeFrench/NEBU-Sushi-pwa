@@ -818,6 +818,18 @@ button{
 
 }
 
+#winterpause {
+  margin: auto; width: min(26rem, calc(100% - 2rem)); padding: 1.75rem;
+  background: var(--card); color: var(--text); text-align: center;
+  border: 1px solid var(--gold-soft); border-radius: 18px;
+}
+#winterpause::backdrop { background: rgb(0 0 0 / 72%); }
+#winterpause h2 { color: var(--gold); margin: 0; }
+#winterpause p { line-height: 1.5; }
+#winterpause button {
+  padding: .8rem 1.3rem; background: var(--gold); color: #111;
+  border: 0; border-radius: 10px; font: inherit; font-weight: 700; cursor: pointer;
+}
 </style>
 </head>
 
@@ -3969,5 +3981,20 @@ setInterval(refreshShopStatusDisplay, 60000);
 
 </script>
 
+<dialog id="winterpause" aria-labelledby="winterpause-title" aria-describedby="winterpause-dates">
+  <h2 id="winterpause-title">❄️ NEBU Sushi macht Winterpause</h2>
+  <p id="winterpause-dates">Vom <strong>22. November bis einschließlich 16. Dezember 2026</strong> bleibt unser Restaurant geschlossen. In dieser Zeit nehmen wir keine Bestellungen an.</p>
+  <p>Ab <strong>17. Dezember</strong> rollen wir wieder Sushi für euch! 🍣</p>
+  <form method="dialog"><button>Zur Speisekarte</button></form>
+</dialog>
+<script>
+(() => {
+  const now = Date.now();
+  if (now >= Date.parse("2026-11-22T00:00:00+01:00") &&
+      now < Date.parse("2026-12-17T00:00:00+01:00")) {
+    document.getElementById("winterpause").showModal();
+  }
+})();
+</script>
 </body>
 </html>
